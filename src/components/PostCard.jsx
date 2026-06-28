@@ -1,10 +1,8 @@
-import React, { useState, useMemo } from 'react';
-import { ExternalLink, Image, FileText, Video, Globe, X } from 'lucide-react';
+import React, { useMemo } from 'react';
+import { ExternalLink, Image, FileText, Video, Globe } from 'lucide-react';
 import { formatTaiwanDate, renderContentWithLinks } from '../utils';
 
 export default function PostCard({ post }) {
-  const [previewImage, setPreviewImage] = useState(null);
-
   // 解析附件 JSON 字串
   const attachmentsList = useMemo(() => {
     if (!post.attachments) return [];
@@ -16,15 +14,6 @@ export default function PostCard({ post }) {
       return [];
     }
   }, [post.attachments]);
-
-  // 將照片附件與其他附件分離
-  const photoAttachments = useMemo(() => {
-    return attachmentsList.filter(att => att.type === 'photo');
-  }, [attachmentsList]);
-
-  const otherAttachments = useMemo(() => {
-    return attachmentsList.filter(att => att.type !== 'photo');
-  }, [attachmentsList]);
 
   // 依據不同教師返回對應的 card class
   const getTeacherCardClass = (author) => {
@@ -107,87 +96,49 @@ export default function PostCard({ post }) {
         </div>
       )}
 
-      {/* 圖片行內預覽圖網格 (多媒體附件直接預覽) */}
-      {photoAttachments.length > 0 && (
-        <div className="photo-thumbnails-grid">
-          {photoAttachments.map((att, idx) => {
-            const displayName = att.filename && att.filename !== 'Unknown' 
-              ? att.filename 
-              : `照片-${idx + 1}`;
-            return (
-              <div 
-                key={idx} 
-                className="photo-thumbnail-container"
-                onClick={() => { if (att.url) setPreviewImage(att.url); }}
-                title="點擊放大圖片"
-              >
-                <img src={att.url} alt={displayName} className="photo-thumbnail-img" />
-                <div className="photo-thumbnail-overlay">
-                  <Image size={16} />
-                  <span>放大預覽</span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* 其他類型附件區塊 (連結、檔案、影片) */}
-      {otherAttachments.length > 0 && (
-        <div className="post-attachments">
-          {otherAttachments.map((att, idx) => {
+      {/* 所有附件區塊 (照片、連結、檔案、影片皆在此處統一渲染為非點擊樣式) */}
+      {attachmentsList.length > 0 && (
+        <div className="post-attachments" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '12px' }}>
+          {attachmentsList.map((att, idx) => {
+            const isPhoto = att.type === 'photo';
             const isLink = att.type === 'link';
             const isFile = att.type === 'file';
             const isVideo = att.type === 'video';
 
-            const displayName = att.filename && att.filename !== 'Unknown' 
-              ? att.filename 
-              : `${isVideo ? '影片' : '檔案'}-${idx + 1}`;
+            let displayName = att.filename && att.filename !== 'Unknown' ? att.filename : '';
+            if (!displayName) {
+              if (isPhoto) displayName = `照片-${idx + 1}`;
+              else if (isVideo) displayName = `影片-${idx + 1}`;
+              else if (isLink) displayName = att.url || '外部連結';
+              else displayName = `檔案-${idx + 1}`;
+            }
 
             if (isLink) {
               return (
-                <a 
+                <div 
                   key={idx} 
-                  href={att.url} 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
-                  className="btn-link-attachment"
-                  title="開啟外部連結"
+                  className="btn-link-attachment-disabled"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 12px', fontSize: '0.82rem', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '6px', color: '#64748b', cursor: 'default' }}
                 >
                   <ExternalLink size={14} />
-                  <span>{att.filename || '外部連結'}</span>
-                </a>
+                  <span>{displayName}</span>
+                </div>
               );
             }
 
             return (
-              <a 
+              <div 
                 key={idx} 
-                href={att.url || '#'} 
-                target={att.url ? "_blank" : "_self"} 
-                rel="noopener noreferrer" 
-                className="tag-media-attachment"
-                title={att.url ? "下載/檢視附件" : ""}
-                onClick={(e) => { if (!att.url) e.preventDefault(); }}
+                className="tag-media-attachment-disabled"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 10px', fontSize: '0.82rem', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '4px', color: '#64748b', cursor: 'default' }}
               >
-                {isFile && <FileText size={13} style={{ color: '#4f46e5' }} />}
-                {isVideo && <Video size={13} style={{ color: '#b91c1c' }} />}
+                {isPhoto && <Image size={13} style={{ color: '#0ea5e9' }} />}
+                {isFile && <FileText size={13} style={{ color: '#64748b' }} />}
+                {isVideo && <Video size={13} style={{ color: '#64748b' }} />}
                 <span>{displayName}</span>
-              </a>
+              </div>
             );
           })}
-        </div>
-      )}
-
-      {/* 圖片預覽彈出式視窗 (Lightbox Overlay) */}
-      {previewImage && (
-        <div className="image-modal-overlay" onClick={() => setPreviewImage(null)}>
-          <div className="image-modal-content" onClick={(e) => e.stopPropagation()}>
-            <button className="image-modal-close" onClick={() => setPreviewImage(null)}>
-              <X size={24} />
-            </button>
-            <img src={previewImage} alt="圖片預覽" className="image-modal-img" />
-          </div>
         </div>
       )}
     </div>
