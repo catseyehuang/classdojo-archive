@@ -1,7 +1,7 @@
 function processClassDojoData() {
   // 1. 定義讀取來源與寫入目標的 ID
-  const SOURCE_FOLDER_ID = "1oI0PkTWb_8hUEUxMUzKZOkmXIJFLmXU6"; // 讀取用的原始資料夾
-  const TARGET_FOLDER_ID = "1FdOzexsdBaIGcUXnKIoS0S-dyB_m-FMr"; // 匯出用的目標資料夾
+  const SOURCE_FOLDER_ID = "Google Folder ID"; // 讀取用的原始資料夾
+  const TARGET_FOLDER_ID = "Google Folder ID"; // 匯出用的目標資料夾
   
   const sourceFolder = DriveApp.getFolderById(SOURCE_FOLDER_ID);
   const targetFolder = DriveApp.getFolderById(TARGET_FOLDER_ID);
@@ -109,7 +109,7 @@ function processClassDojoData() {
 
 
   // 7. 匯出處理後的資料到 JSON 檔案
-  const outputFileName = 'dojo_data_test.json';
+  const outputFileName = 'dojo_data.json';
   const outputContent = JSON.stringify(uniquePosts, null, 2); // 格式化輸出
 
   try {
