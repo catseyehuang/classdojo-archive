@@ -9,6 +9,7 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "predeploy": "npm run build",
+    "postbuild": "rm -f dist/dojo_data.json",
     "deploy": "gh-pages -d dist"
   },
   "dependencies": {
