@@ -1,11 +1,13 @@
 function processClassDojoData() {
   // 1. 定義讀取來源與寫入目標的 ID
-  const SOURCE_FOLDER_ID = "Google Folder ID"; // 讀取用的原始資料夾
-  const TARGET_FOLDER_ID = "Google Folder ID"; // 匯出用的目標資料夾
-  
+  const SOURCE_FOLDER_ID = "讀取用的原始資料夾 ID"; // 讀取用的原始資料夾
+  const TARGET_FOLDER_ID = "匯出用的目標資料夾 ID"; // 匯出用的目標資料夾
+  const BACKUP_FOLDER_ID = '匯出用的備份資料夾 ID'; // 匯出用的備份資料夾
+
   const sourceFolder = DriveApp.getFolderById(SOURCE_FOLDER_ID);
   const targetFolder = DriveApp.getFolderById(TARGET_FOLDER_ID);
-  
+  const backupFolder = DriveApp.getFolderById(BACKUP_FOLDER_ID);
+
   // 檢查資料夾 ID 是否為空（預防手誤刪除）
   if (!SOURCE_FOLDER_ID) {
     Logger.log('錯誤：請在腳本中設定正確的 SOURCE_FOLDER_ID');
@@ -109,20 +111,30 @@ function processClassDojoData() {
 
 
   // 7. 匯出處理後的資料到 JSON 檔案
-  const outputFileName = 'dojo_data.json';
   const outputContent = JSON.stringify(uniquePosts, null, 2); // 格式化輸出
 
+  const baseName = 'dojo_data_test';
+  const timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyyMMdd-HHmmss");
+  
+  const fileNameFixed = `${baseName}.json`;
+  const fileNameTimestamp = `${baseName}_${timestamp}.json`;
+  
   try {
+    // --- 處理第一個檔案：dojo_data.json (檢查並刪除舊檔) ---
     // 檢查目標資料夾是否已存在同名檔案，若有則刪除舊檔 (避免重複)
-    const existingFiles = targetFolder.getFilesByName(outputFileName);
+    const existingFiles = targetFolder.getFilesByName(fileNameFixed);
     while (existingFiles.hasNext()) {
       existingFiles.next().setTrashed(true);
     }
 
     // 寫入目標資料夾
-    targetFolder.createFile(outputFileName, outputContent, MimeType.PLAIN_TEXT);
-    
-    Logger.log(`🎉 成功匯出 ${uniquePosts.length} 筆資料至 ${outputFileName}`);
+    targetFolder.createFile(fileNameFixed, outputContent, MimeType.PLAIN_TEXT);
+    Logger.log(`✅ 已更新檔案: ${fileNameFixed}`);
+
+    // --- 處理第二個檔案：帶有時間戳的備份檔 ---
+    backupFolder.createFile(fileNameTimestamp, outputContent, MimeType.PLAIN_TEXT);
+    Logger.log(`✅ 已建立備份檔案: ${fileNameTimestamp}`);
+  
   } catch (e) {
     Logger.log(`❌ 匯出檔案時發生錯誤: ${e.message}`);
   }
