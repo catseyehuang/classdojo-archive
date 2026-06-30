@@ -25,3 +25,4 @@ dist-ssr
 
 # Data files containing private records
 dojo_data.json
+public/dojo_data.json
