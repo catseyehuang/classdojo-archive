@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Inbox, Archive, Calendar as CalendarIcon, ClipboardList, Users, Cloud, Settings, X, Loader2, RefreshCw } from 'lucide-react';
+import { Search, Inbox, Archive, Calendar as CalendarIcon, ClipboardList, Users, Cloud, Settings, X, Loader2, RefreshCw, BrainCircuit, ArrowLeft } from 'lucide-react';
 import Calendar from './components/Calendar';
 import PostCard from './components/PostCard';
 import SmartSummary from './components/SmartSummary';
@@ -21,6 +21,8 @@ export default function App() {
   const [syncError, setSyncError] = useState('');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [showSaveSuccess, setShowSaveSuccess] = useState(false);
+  const [activeMobileTab, setActiveMobileTab] = useState('feed'); // 'filter' | 'feed' | 'summary'
+  const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
 
   const handleSaveSettings = () => {
     localStorage.setItem('dojo_google_drive_api_key', driveApiKey);
@@ -199,71 +201,144 @@ export default function App() {
     <div className="app-container">
       {/* 頂部標頭列 - 整合搜尋與同步指示燈 */}
       <header className="app-header">
-        <div className="header-left">
-          <div className="header-logo-icon">CD</div>
-          <div className="header-title-group">
-            <h1 className="header-title">ClassDojo Archive</h1>
-            <div className="header-subtitle">Jim 班級聯絡簿</div>
-          </div>
-        </div>
-
-        {/* 全文檢索搜尋框居中 */}
-        <div className="header-center">
-          <div className="search-wrapper">
-            <Search className="search-icon" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="全文檢索 ClassDojo 歷史紀錄..."
-              className="search-input"
-              aria-label="搜尋貼文"
-            />
-          </div>
-        </div>
-
-        {/* 雲端同步狀態與設定在右側 */}
-        <div className="header-right">
-          <div className="sync-status-indicator">
-            {syncStatus === 'loading' && <Loader2 className="sync-spinner" size={14} />}
-            {syncStatus === 'success' && <span className="sync-dot"></span>}
-            {syncStatus === 'error' && <span className="sync-dot error"></span>}
-            {syncStatus === 'idle' && <span className="sync-dot local"></span>}
-            <span className={`sync-status-text ${syncStatus}`}>
-              {syncStatus === 'loading' && '同步中...'}
-              {syncStatus === 'success' && '雲端同步中'}
-              {syncStatus === 'error' && '同步失敗'}
-              {syncStatus === 'idle' && '本地資料'}
-            </span>
-          </div>
-
-          {syncStatus === 'success' ? (
+        {isMobileSearchOpen ? (
+          /* 手機版搜尋展開狀態 */
+          <div className="mobile-search-overlay" style={{ display: 'flex', width: '100%', alignItems: 'center', gap: '8px' }}>
             <button 
-              className="gdrive-refresh-btn" 
-              onClick={handleConnectGDrive} 
-              title="重新更新雲端資料"
-              aria-label="重新更新雲端資料"
+              className="search-back-btn" 
+              onClick={() => {
+                setIsMobileSearchOpen(false);
+                setSearchQuery('');
+              }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '8px', color: 'var(--text-secondary)' }}
             >
-              <RefreshCw size={16} className={syncStatus === 'loading' ? "spinner-animate" : ""} style={{ animation: syncStatus === 'loading' ? 'spin 1s linear infinite' : 'none' }} />
+              <ArrowLeft size={20} />
             </button>
-          ) : (
-            <button className="gdrive-btn" onClick={handleConnectGDrive} disabled={syncStatus === 'loading'}>
-              <Cloud size={16} className="gdrive-icon" />
-              <span>連結 Google Drive</span>
-            </button>
-          )}
+            <div className="search-wrapper" style={{ flexGrow: 1, maxWidth: '100%' }}>
+              <Search className="search-icon" size={16} />
+              <input
+                type="text"
+                placeholder="搜尋歷史貼文..."
+                className="search-input"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                autoFocus
+              />
+            </div>
+          </div>
+        ) : (
+          /* 一般狀態 (桌機 & 手機未展開搜尋) */
+          <>
+            <div className="header-left">
+              <div className="header-logo-icon">CD</div>
+              <div className="header-title-group">
+                <h1 className="header-title">ClassDojo Archive</h1>
+                <div className="header-subtitle-container" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span className="header-subtitle">Jim 班級聯絡簿</span>
+                  <span className="mobile-status-dot-wrapper">
+                    <span className={`sync-dot ${syncStatus === 'idle' ? 'local' : syncStatus}`} style={{ width: '6px', height: '6px', boxShadow: 'none' }}></span>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                      {syncStatus === 'success' ? '雲端' : syncStatus === 'loading' ? '同步' : '本地'}
+                    </span>
+                  </span>
+                </div>
+              </div>
+            </div>
 
-          <button className="settings-btn" onClick={() => setIsSettingsOpen(true)} title="開啟設定">
-            <Settings size={18} />
-          </button>
-        </div>
+            {/* 桌機版搜尋框 (手機版隱藏) */}
+            <div className="header-center desktop-search-only">
+              <div className="search-wrapper">
+                <Search className="search-icon" size={16} />
+                <input
+                  type="text"
+                  placeholder="全文檢索 ClassDojo 歷史紀錄..."
+                  className="search-input"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  aria-label="搜尋貼文"
+                />
+              </div>
+            </div>
+
+            {/* 雲端同步狀態與設定在右側 */}
+            <div className="header-right">
+              {/* 桌機版狀態指示器 (手機版隱藏) */}
+              <div className="sync-status-indicator desktop-status-only">
+                {syncStatus === 'loading' && <Loader2 className="sync-spinner" size={14} />}
+                {syncStatus === 'success' && <span className="sync-dot"></span>}
+                {syncStatus === 'error' && <span className="sync-dot error"></span>}
+                {syncStatus === 'idle' && <span className="sync-dot local"></span>}
+                <span className={`sync-status-text ${syncStatus}`}>
+                  {syncStatus === 'loading' && '同步中...'}
+                  {syncStatus === 'success' && '雲端同步中'}
+                  {syncStatus === 'error' && '同步失敗'}
+                  {syncStatus === 'idle' && '本地資料'}
+                </span>
+              </div>
+
+              {/* 手機版專屬搜尋切換按鈕 (桌機版隱藏) */}
+              <button 
+                className="mobile-search-toggle" 
+                onClick={() => setIsMobileSearchOpen(true)}
+                title="展開搜尋"
+              >
+                <Search size={18} />
+              </button>
+
+              {syncStatus === 'success' ? (
+                <button 
+                  className="gdrive-refresh-btn" 
+                  onClick={handleConnectGDrive} 
+                  title="重新更新雲端資料"
+                  aria-label="重新更新雲端資料"
+                >
+                  <RefreshCw size={16} className={syncStatus === 'loading' ? "spinner-animate" : ""} style={{ animation: syncStatus === 'loading' ? 'spin 1s linear infinite' : 'none' }} />
+                </button>
+              ) : (
+                <button className="gdrive-btn" onClick={handleConnectGDrive} disabled={syncStatus === 'loading'}>
+                  <Cloud size={16} className="gdrive-icon" />
+                  <span className="desktop-btn-text">連結 Google Drive</span>
+                </button>
+              )}
+
+              <button className="settings-btn" onClick={() => setIsSettingsOpen(true)} title="開啟設定">
+                <Settings size={18} />
+              </button>
+            </div>
+          </>
+        )}
       </header>
+
+      {/* 行動裝置標籤切換列 */}
+      <div className="mobile-tabs-bar">
+        <button 
+          className={`mobile-tab-btn ${activeMobileTab === 'filter' ? 'active' : ''}`}
+          onClick={() => setActiveMobileTab('filter')}
+        >
+          <Search size={18} />
+          <span>時間與篩選</span>
+        </button>
+        <button 
+          className={`mobile-tab-btn ${activeMobileTab === 'feed' ? 'active' : ''}`}
+          onClick={() => setActiveMobileTab('feed')}
+        >
+          <Inbox size={18} />
+          <span>歷史貼文 ({filteredPosts.length})</span>
+        </button>
+        <button 
+          className={`mobile-tab-btn ${activeMobileTab === 'summary' ? 'active' : ''}`}
+          onClick={() => setActiveMobileTab('summary')}
+        >
+          <BrainCircuit size={18} />
+          <span>智慧總結</span>
+        </button>
+      </div>
 
       {/* 主要三欄版面 - 左右整條側塊無氣泡框 */}
       <main className="app-dashboard">
 
         {/* 左側欄 (22% 寬)：日曆與篩選 */}
-        <section className="sidebar-panel sidebar-left">
+        <section className={`sidebar-panel sidebar-left ${activeMobileTab === 'filter' ? 'mobile-show' : 'mobile-hide'}`}>
 
           {/* 日曆檢視器 */}
           <div className="sidebar-section">
@@ -339,7 +414,7 @@ export default function App() {
         </section>
 
         {/* 中側欄：滾動 Feed 區塊 */}
-        <section className="feed-column">
+        <section className={`feed-column ${activeMobileTab === 'feed' ? 'mobile-show' : 'mobile-hide'}`}>
           <div className="feed-title-header">
             <h2 className="feed-title">全部歷史紀錄</h2>
             <span className="feed-count-badge">{filteredPosts.length} 筆</span>
@@ -382,7 +457,7 @@ export default function App() {
         </section>
 
         {/* 右側欄 (30% 寬)：智慧重要總結 */}
-        <section className="sidebar-panel sidebar-right">
+        <section className={`sidebar-panel sidebar-right ${activeMobileTab === 'summary' ? 'mobile-show' : 'mobile-hide'}`}>
           <SmartSummary
             filteredPosts={filteredPosts}
             allPosts={posts}
