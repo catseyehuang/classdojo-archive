@@ -204,8 +204,8 @@ export default function App() {
         {isMobileSearchOpen ? (
           /* 手機版搜尋展開狀態 */
           <div className="mobile-search-overlay" style={{ display: 'flex', width: '100%', alignItems: 'center', gap: '8px' }}>
-            <button 
-              className="search-back-btn" 
+            <button
+              className="search-back-btn"
               onClick={() => {
                 setIsMobileSearchOpen(false);
                 setSearchQuery('');
@@ -277,8 +277,8 @@ export default function App() {
               </div>
 
               {/* 手機版專屬搜尋切換按鈕 (桌機版隱藏) */}
-              <button 
-                className="mobile-search-toggle" 
+              <button
+                className="mobile-search-toggle"
                 onClick={() => setIsMobileSearchOpen(true)}
                 title="展開搜尋"
               >
@@ -286,9 +286,9 @@ export default function App() {
               </button>
 
               {syncStatus === 'success' ? (
-                <button 
-                  className="gdrive-refresh-btn" 
-                  onClick={handleConnectGDrive} 
+                <button
+                  className="gdrive-refresh-btn"
+                  onClick={handleConnectGDrive}
                   title="重新更新雲端資料"
                   aria-label="重新更新雲端資料"
                 >
@@ -311,21 +311,21 @@ export default function App() {
 
       {/* 行動裝置標籤切換列 */}
       <div className="mobile-tabs-bar">
-        <button 
+        <button
           className={`mobile-tab-btn ${activeMobileTab === 'filter' ? 'active' : ''}`}
           onClick={() => setActiveMobileTab('filter')}
         >
           <Search size={18} />
           <span>時間與篩選</span>
         </button>
-        <button 
+        <button
           className={`mobile-tab-btn ${activeMobileTab === 'feed' ? 'active' : ''}`}
           onClick={() => setActiveMobileTab('feed')}
         >
           <Inbox size={18} />
           <span>歷史貼文 ({filteredPosts.length})</span>
         </button>
-        <button 
+        <button
           className={`mobile-tab-btn ${activeMobileTab === 'summary' ? 'active' : ''}`}
           onClick={() => setActiveMobileTab('summary')}
         >
@@ -512,7 +512,7 @@ export default function App() {
               className="settings-input"
               value={folderId}
               onChange={(e) => setFolderId(e.target.value)}
-              placeholder="1FdOzexsdBaIGcUXnKIoS0S-dyB_m-FMr"
+              placeholder="請輸入雲端資料夾 ID"
             />
             <p className="settings-desc">
               請輸入包含 dojo_data.json 的雲端資料夾 ID。
