@@ -1,46 +1,95 @@
 function processClassDojoData() {
-  // 1. 定義讀取來源與寫入目標的 ID
-  const SOURCE_FOLDER_ID = "讀取用的原始資料夾 ID"; // 讀取用的原始資料夾
-  const TARGET_FOLDER_ID = "匯出用的目標資料夾 ID"; // 匯出用的目標資料夾
-  const BACKUP_FOLDER_ID = '匯出用的備份資料夾 ID'; // 匯出用的備份資料夾
+  // 1. 從專案屬性讀取 Root 資料夾 ID
+  const scriptProperties = PropertiesService.getScriptProperties();
+  const ROOT_FOLDER_ID = scriptProperties.getProperty('ROOT_FOLDER_ID') || '';
 
-  const sourceFolder = DriveApp.getFolderById(SOURCE_FOLDER_ID);
-  const targetFolder = DriveApp.getFolderById(TARGET_FOLDER_ID);
-  const backupFolder = DriveApp.getFolderById(BACKUP_FOLDER_ID);
-
-  // 檢查資料夾 ID 是否為空（預防手誤刪除）
-  if (!SOURCE_FOLDER_ID) {
-    Logger.log('錯誤：請在腳本中設定正確的 SOURCE_FOLDER_ID');
+  // 檢查資料夾 ID 是否為空
+  if (!ROOT_FOLDER_ID) {
+    Logger.log('錯誤：請在 GAS 專案設定中設定 Script Properties：ROOT_FOLDER_ID');
     return;
   }
 
-  // 2. 讀取來源資料夾中的JSON檔案
+  const rootFolder = DriveApp.getFolderById(ROOT_FOLDER_ID);
+  
+  // 動態尋找子資料夾：JSON_RAW, public, Dojo_data_backup
+  // A. 來源資料夾 (JSON_RAW)
+  let sourceFolder;
+  const rawSubFolders = rootFolder.getFoldersByName('JSON_RAW');
+  if (rawSubFolders.hasNext()) {
+    sourceFolder = rawSubFolders.next();
+  } else {
+    sourceFolder = rootFolder.createFolder('JSON_RAW');
+    Logger.log('已自動在 Root 建立 JSON_RAW 資料夾');
+  }
+
+  // B. 目標輸出資料夾 (指定放在 public 子資料夾，若無則自動建立)
+  let targetFolder;
+  const publicSubFolders = rootFolder.getFoldersByName('public');
+  if (publicSubFolders.hasNext()) {
+    targetFolder = publicSubFolders.next();
+    Logger.log('✅ 已定位輸出目標：public 資料夾');
+  } else {
+    targetFolder = rootFolder.createFolder('public');
+    Logger.log('已自動在 Root 建立 public 資料夾');
+  }
+
+  // C. 備份資料夾 (優先使用 Dojo_data_backup，若無則自動建立)
+  let backupFolder;
+  const backupSubFolders = rootFolder.getFoldersByName('Dojo_data_backup');
+  if (backupSubFolders.hasNext()) {
+    backupFolder = backupSubFolders.next();
+  } else {
+    backupFolder = rootFolder.createFolder('Dojo_data_backup');
+    Logger.log('已自動在 Root 建立 Dojo_data_backup 資料夾');
+  }
+
+  // 2. 讀取目標資料夾中現有的 dojo_data.json 做為歷史資料庫的 Base
+  const baseName = 'dojo_data'; // 可改為 'dojo_data_test' 進行測試
+  const fileNameFixed = `${baseName}.json`;
+  
+  let existingPostsMap = new Map();
+  const existingFiles = targetFolder.getFilesByName(fileNameFixed);
+  if (existingFiles.hasNext()) {
+    const existingFile = existingFiles.next();
+    try {
+      const existingContent = existingFile.getBlob().getDataAsString();
+      const existingPostsList = JSON.parse(existingContent);
+      if (Array.isArray(existingPostsList)) {
+        existingPostsList.forEach(post => {
+          existingPostsMap.set(post.post_id, post);
+        });
+        Logger.log(`✅ 成功載入歷史 Base 資料 (${existingPostsMap.size} 筆不重複貼文)`);
+      }
+    } catch (e) {
+      Logger.log(`⚠️ 讀取現有 ${fileNameFixed} 失敗，將以全新資料庫處理: ${e.message}`);
+    }
+  } else {
+    Logger.log(`ℹ️ 未找到現有 ${fileNameFixed}，將以全新資料庫處理`);
+  }
+
+  // 3. 讀取來源資料夾中直接放置的全新原始 JSON 檔案
   const files = sourceFolder.getFilesByType(MimeType.PLAIN_TEXT);
-
   let allRawItems = [];
-  let processedPosts = [];
+  let processedFiles = [];
 
-  Logger.log('開始讀取 JSON 檔案...');
-
+  Logger.log('開始讀取全新 JSON 檔案...');
   while (files.hasNext()) {
     const file = files.next();
-    //const fileName = file.getName();
-    Logger.log("偵測到檔案: " + file.getName()); // 新增這行來確認是否真的抓到檔案
+    Logger.log("偵測到檔案: " + file.getName());
     try {
       const content = file.getBlob().getDataAsString();
       const data = JSON.parse(content);
-
-      // 確保即使檔案結構不同也能安全讀取
       const items = data._items || [];
       allRawItems = allRawItems.concat(items);
-      //Logger.log(`✅ 成功讀取: ${file.getName()} (共 ${items.length} 筆貼文)`);
+      processedFiles.push(file); // 記錄成功處理的檔案，稍後歸檔
     } catch (e) {
       Logger.log(`❌ 讀取 ${file.getName()} 時發生錯誤: ${e.message}`);
     }
   }
-  Logger.log(`--- 檔案讀取完畢，共收集到 ${allRawItems.length} 筆原始貼文 ---`);
+  Logger.log(`--- 檔案讀取完畢，共收集到 ${allRawItems.length} 筆全新原始貼文 ---`);
 
-  // 3. 解析並清洗資料 (轉換成 Web App Schema)
+  // 4. 解析並清洗全新資料 (轉換成 Web App Schema)
+  let newPostsMap = new Map();
   for (const item of allRawItems) {
     let attachments = [];
     const contents = item.contents || {};
@@ -62,80 +111,86 @@ function processClassDojoData() {
       author: item.senderName || item.headerText,
       class_name: item.headerSubtext,
       content_raw: contents.body || '',
-      // 略過 'translation', 'likes', 'comments' 欄位
       attachments: JSON.stringify(attachments)
     };
-    processedPosts.push(post);
+    newPostsMap.set(post.post_id, post);
   }
 
-  // 4. 資料清理：去重與時間排序 (手動實現)
-  // 範例：根據 post_id 去重
-  const uniquePostsMap = new Map();
-  for (const post of processedPosts) {
-    uniquePostsMap.set(post.post_id, post);
+  // 5. 合併全新資料與歷史 Base 資料（增量去重）
+  for (const [postId, post] of newPostsMap.entries()) {
+    existingPostsMap.set(postId, post);
   }
-  let uniquePosts = Array.from(uniquePostsMap.values());
+  let mergedPosts = Array.from(existingPostsMap.values());
 
-  // 範例：將時間字串轉換為 JavaScript Date 物件並排序 (新到舊)
-  uniquePosts.forEach(post => {
-    post.created_at = new Date(post.created_at);
-  });
-  uniquePosts.sort((a, b) => b.created_at.getTime() - a.created_at.getTime());
-
-  Logger.log(`--- 資料清洗完畢，最終獲得 ${uniquePosts.length} 筆不重複的貼文 ---`);
-
-  // 5. 將 created_at 轉換為台灣時區並新增 grade 欄位 (手動實現)
-  uniquePosts.forEach(post => {
-    // 假設 post.created_at 是原始的日期字串
+  // 6. 將 created_at 轉換為 Date 物件，進行台灣時間時區轉換、動態年級判定與時間排序
+  mergedPosts.forEach(post => {
+    // 確保 created_at 是 Date 物件以進行排序
     const dateObj = new Date(post.created_at);
-    const timeMs = dateObj.getTime(); // 取得時間戳 (毫秒數)
+    post.created_at = dateObj; // stringify 時會自動轉回 ISO 格式字串
 
-    // 轉換成台灣時間字串 (GMT+8) 使用 Utilities.formatDate 強制轉換為台灣時間字串 
+    // 轉換成台灣時間字串 (GMT+8) 
     post.created_at_taiwan = Utilities.formatDate(dateObj, "GMT+8", "yyyy-MM-dd'T'HH:mm:ss");
 
+    // 依據台灣時間提取年與月，進行學期/年級自動判定
+    const year = parseInt(Utilities.formatDate(dateObj, "GMT+8", "yyyy"), 10);
+    const month = parseInt(Utilities.formatDate(dateObj, "GMT+8", "M"), 10);
 
-    // Grade 判斷邏輯 (手動實現)
-    const postDate = timeMs;
-    if (postDate >= new Date('2026-02-01T00:00:00+08:00') && postDate <= new Date('2026-07-31T23:59:59+08:00')) {
-      post.grade = '114年下學期(二下)';
-    } else if (postDate >= new Date('2025-08-01T00:00:00+08:00') && postDate <= new Date('2026-01-31T23:59:59+08:00')) {
-      post.grade = '114年上學期(二上)';
-    } else if (postDate >= new Date('2025-02-01T00:00:00+08:00') && postDate <= new Date('2025-07-31T23:59:59+08:00')) {
-      post.grade = '113年下學期(一下)';
-    } else if (postDate >= new Date('2024-08-01T00:00:00+08:00') && postDate <= new Date('2025-01-31T23:59:59+08:00')) {
-      post.grade = '113年上學期(一上)';
-    } else {
-      post.grade = '其他';
-    }
+    // 判斷學年度 (台灣學年度 = 西元 - 1911，若是 1 月則屬於前一年的學年度，需減 1912)
+    const academicYear = (month >= 8) ? (year - 1911) : (year - 1912);
+
+    // 判斷學期與年級字串
+    const semesterName = (month >= 8 || month === 1) ? "上學期" : "下學期";
+    const gradeNum = academicYear - 112; // 113 學年度為一年級
+
+    const chineseNums = ["", "一", "二", "三", "四", "五", "六"];
+    const gradeChinese = chineseNums[gradeNum] || "其他";
+    const suffix = (semesterName === "上學期") ? "上" : "下";
+
+    post.grade = `${academicYear}年${semesterName}(${gradeChinese}${suffix})`;
   });
 
+  // 依時間由新到舊排序
+  mergedPosts.sort((a, b) => b.created_at.getTime() - a.created_at.getTime());
+
+  Logger.log(`--- 資料合併與清洗完畢，最終獲得 ${mergedPosts.length} 筆不重複的貼文 ---`);
 
   // 7. 匯出處理後的資料到 JSON 檔案
-  const outputContent = JSON.stringify(uniquePosts, null, 2); // 格式化輸出
-
-  const baseName = 'dojo_data_test';
+  const outputContent = JSON.stringify(mergedPosts, null, 2);
   const timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyyMMdd-HHmmss");
-  
-  const fileNameFixed = `${baseName}.json`;
   const fileNameTimestamp = `${baseName}_${timestamp}.json`;
-  
+
   try {
-    // --- 處理第一個檔案：dojo_data.json (檢查並刪除舊檔) ---
-    // 檢查目標資料夾是否已存在同名檔案，若有則刪除舊檔 (避免重複)
-    const existingFiles = targetFolder.getFilesByName(fileNameFixed);
-    while (existingFiles.hasNext()) {
-      existingFiles.next().setTrashed(true);
+    // --- 寫入固定名稱檔案 (dojo_data.json) ---
+    const existingFixedFiles = targetFolder.getFilesByName(fileNameFixed);
+    while (existingFixedFiles.hasNext()) {
+      existingFixedFiles.next().setTrashed(true);
     }
-
-    // 寫入目標資料夾
     targetFolder.createFile(fileNameFixed, outputContent, MimeType.PLAIN_TEXT);
-    Logger.log(`✅ 已更新檔案: ${fileNameFixed}`);
+    Logger.log(`✅ 已更新固定檔案: ${fileNameFixed}`);
 
-    // --- 處理第二個檔案：帶有時間戳的備份檔 ---
+    // --- 寫入帶有時間戳的歷史備份檔 ---
     backupFolder.createFile(fileNameTimestamp, outputContent, MimeType.PLAIN_TEXT);
     Logger.log(`✅ 已建立備份檔案: ${fileNameTimestamp}`);
-  
+
+    // --- 步驟 E: 自動把已處理的新原始檔案移到 Archived_Raw 子資料夾 ---
+    if (processedFiles.length > 0) {
+      // 確保 Archived_Raw 子資料夾存在
+      let archivedFolder;
+      const subFolders = sourceFolder.getFoldersByName('Archived_Raw');
+      if (subFolders.hasNext()) {
+        archivedFolder = subFolders.next();
+      } else {
+        archivedFolder = sourceFolder.createFolder('Archived_Raw');
+        Logger.log('已建立 Archived_Raw 封存資料夾');
+      }
+
+      for (const file of processedFiles) {
+        file.moveTo(archivedFolder);
+        Logger.log(`📁 原始檔已歸檔並移至 Archived_Raw: ${file.getName()}`);
+      }
+    }
+    
   } catch (e) {
-    Logger.log(`❌ 匯出檔案時發生錯誤: ${e.message}`);
+    Logger.log(`❌ 匯出或歸檔檔案時發生錯誤: ${e.message}`);
   }
 }

@@ -1,12 +1,16 @@
 function fetchAllClassDojoHistoryWithTimeFilename() {
+  // 從專案屬性讀取 Root 資料夾 ID 與 Cookie 
+  const scriptProperties = PropertiesService.getScriptProperties();
+  const ROOT_FOLDER_ID = scriptProperties.getProperty('ROOT_FOLDER_ID') || '';
+  const myCookie = scriptProperties.getProperty('CL_COOKIE') || '';
+
+  if (!ROOT_FOLDER_ID || !myCookie) {
+    Logger.log('錯誤：請在 GAS 專案設定中設定 Script Properties：ROOT_FOLDER_ID, CL_COOKIE');
+    return;
+  }
+
   // 1. 起始 URL
   var apiUrl = "https://home.classdojo.com/api/storyFeed?withStudentCommentsAndLikes=true&withSyntheticPosts=true";
-  
-  // 2. 貼上你的 Cookie
-  var myCookie = "myCookie"
-  
-  // 3. 你的 Google Drive 資料夾 ID
-  var folderId = "Google Drive 資料夾 ID";
 
   var options = {
     "method": "get",
@@ -18,7 +22,23 @@ function fetchAllClassDojoHistoryWithTimeFilename() {
     "muteHttpExceptions": true
   };
 
-  var folder = DriveApp.getFolderById(folderId);
+  let folder;
+  try {
+    const rootFolder = DriveApp.getFolderById(ROOT_FOLDER_ID);
+    
+    // 動態尋找或自動建立 JSON_RAW 子資料夾
+    const subFolders = rootFolder.getFoldersByName('JSON_RAW');
+    if (subFolders.hasNext()) {
+      folder = subFolders.next();
+    } else {
+      folder = rootFolder.createFolder('JSON_RAW');
+      Logger.log('已自動在 Root 建立 JSON_RAW 子資料夾');
+    }
+  } catch (e) {
+    Logger.log("❌ 無法取得 Google Drive 資料夾，請檢查 ROOT_FOLDER_ID 是否正確: " + e.toString());
+    return;
+  }
+
   var pageCount = 1;
   var maxPages = 200;
 
@@ -28,8 +48,15 @@ function fetchAllClassDojoHistoryWithTimeFilename() {
     
     try {
       var response = UrlFetchApp.fetch(apiUrl, options);
-      if (response.getResponseCode() !== 200) {
-        Logger.log("❌ 發生錯誤，HTTP代碼：" + response.getResponseCode());
+      var responseCode = response.getResponseCode();
+      
+      if (responseCode !== 200) {
+        Logger.log("❌ 發生錯誤，HTTP代碼：" + responseCode);
+        if (responseCode === 401 || responseCode === 403) {
+          Logger.log("⚠️ 偵測到未授權錯誤 (401/403)，可能是 Cookie 已經過期，中斷迴圈！");
+        } else {
+          Logger.log("錯誤內容：" + response.getContentText());
+        }
         break;
       }
 

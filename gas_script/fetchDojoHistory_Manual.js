@@ -1,16 +1,16 @@
-// 3. 貼上你的 Google Drive 資料夾 ID
-  var folderId = "Google Drive 資料夾 ID";
-
 function fetchClassDojoHistoryManual() {
-  // 1. 貼上你從 F12 複製下來的 Request URL
-  //在右側的 Headers -> General 找到 Request URL，把它複製下來（這就是 apiUrl）。
-  
+  // 從專案屬性讀取 Root 資料夾 ID 與 Cookie 
+  const scriptProperties = PropertiesService.getScriptProperties();
+  const ROOT_FOLDER_ID = scriptProperties.getProperty('ROOT_FOLDER_ID') || '';
+  const myCookie = scriptProperties.getProperty('CL_COOKIE') || '';
+
+  if (!ROOT_FOLDER_ID || !myCookie) {
+    Logger.log('錯誤：請在 GAS 專案設定中設定 Script Properties：ROOT_FOLDER_ID, CL_COOKIE');
+    return;
+  }
+
+  // 1. Request URL (網址預設值，若有變動可在此直接修改)
   var apiUrl = "https://home.classdojo.com/api/storyFeed?withStudentCommentsAndLikes=true&withSyntheticPosts=true";
-  
-  // 2. 貼上你從 F12 複製下來的 Cookie (整串字串)
-  //往下捲到 Request Headers 找到 cookie:，把後面那一整串很長的字串複製下來（這就是 myCookie）。
-  var myCookie = "myCookie"
-  
 
   // 設定請求標頭，偽裝成一般瀏覽器
   var options = {
@@ -23,29 +23,42 @@ function fetchClassDojoHistoryManual() {
     "muteHttpExceptions": true
   };
 
-  // 確保 folder 變數被正確定義
-  var folder = DriveApp.getFolderById(folderId);
+  var responseCode = null;
 
   try {
+    const rootFolder = DriveApp.getFolderById(ROOT_FOLDER_ID);
+    
+    // 動態尋找或自動建立 JSON_RAW 子資料夾
+    let folder;
+    const subFolders = rootFolder.getFoldersByName('JSON_RAW');
+    if (subFolders.hasNext()) {
+      folder = subFolders.next();
+    } else {
+      folder = rootFolder.createFolder('JSON_RAW');
+      Logger.log('已自動在 Root 建立 JSON_RAW 子資料夾');
+    }
+
     // 發送請求
     var response = UrlFetchApp.fetch(apiUrl, options);
-    var responseCode = response.getResponseCode();
+    responseCode = response.getResponseCode();
 
     if (responseCode === 200) {
       var jsonString = response.getContentText();
       
       // 解析並重新格式化 JSON，讓它有縮排、更易讀
       var jsonData = JSON.parse(jsonString);
-      var prettyJson = JSON.stringify(jsonData, null, 2);
-
       var items = jsonData._items || [];
+
+      if (items.length === 0) {
+        Logger.log("⚠️ ClassDojo 回傳的貼文清單為空。");
+        return;
+      }
 
       // --- 核心邏輯：決定檔名時間戳記 進入 _items 陣列抓取第一筆貼文時間---
       var rawTimestamp = items[0].time;
       var dateObj = new Date(rawTimestamp);
       var timeStr = Utilities.formatDate(dateObj, "GMT+8", "yyyyMMdd_HHmmss");
       var formattedFileName = "ClassDojo_Feed_" + timeStr + ".json";
-      
 
       // --- 💥 檔名防呆重複檢查 💥 ---
       var existingFiles = folder.getFilesByName(formattedFileName);
@@ -63,7 +76,9 @@ function fetchClassDojoHistoryManual() {
       Logger.log("錯誤訊息：" + response.getContentText());
     }
   } catch (e) {
-    Logger.log("HTTP 狀態碼：" + responseCode);
+    if (responseCode !== null) {
+      Logger.log("HTTP 狀態碼：" + responseCode);
+    }
     Logger.log("腳本執行失敗：" + e.toString());
   }
 }
