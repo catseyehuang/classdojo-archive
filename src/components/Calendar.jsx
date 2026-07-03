@@ -1,13 +1,18 @@
 import React, { useState, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 
+const getDatePart = (dateStr) => {
+  if (!dateStr) return '';
+  return dateStr.includes('T') ? dateStr.split('T')[0] : dateStr.split(' ')[0];
+};
+
 export default function Calendar({ posts, selectedDate, onSelectDate }) {
   // 找出貼文中所有包含貼文的台灣日期，格式為 YYYY-MM-DD
   const postDates = useMemo(() => {
     const dates = new Set();
     posts.forEach(post => {
       if (post.created_at_taiwan) {
-        const datePart = post.created_at_taiwan.split(' ')[0]; // 提取 "2026-06-26"
+        const datePart = getDatePart(post.created_at_taiwan); // 提取 "2026-06-26"
         dates.add(datePart);
       }
     });
@@ -18,7 +23,7 @@ export default function Calendar({ posts, selectedDate, onSelectDate }) {
   const initialDate = useMemo(() => {
     if (selectedDate) return new Date(selectedDate);
     if (posts.length > 0 && posts[0].created_at_taiwan) {
-      return new Date(posts[0].created_at_taiwan.split(' ')[0]);
+      return new Date(getDatePart(posts[0].created_at_taiwan));
     }
     return new Date();
   }, [posts, selectedDate]);
@@ -37,7 +42,7 @@ export default function Calendar({ posts, selectedDate, onSelectDate }) {
     const uniqueYears = new Set();
     posts.forEach(post => {
       if (post.created_at_taiwan) {
-        const yr = new Date(post.created_at_taiwan.split(' ')[0]).getFullYear();
+        const yr = new Date(getDatePart(post.created_at_taiwan)).getFullYear();
         if (!isNaN(yr)) uniqueYears.add(yr);
       }
     });

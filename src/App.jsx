@@ -23,6 +23,7 @@ export default function App() {
   const [showSaveSuccess, setShowSaveSuccess] = useState(false);
   const [activeMobileTab, setActiveMobileTab] = useState('feed'); // 'filter' | 'feed' | 'summary'
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
+  const [visiblePostsCount, setVisiblePostsCount] = useState(15);
 
   const handleSaveSettings = () => {
     localStorage.setItem('dojo_google_drive_api_key', driveApiKey);
@@ -196,6 +197,16 @@ export default function App() {
 
     return result;
   }, [posts, searchQuery, selectedGrade, selectedTeacher, selectedDate]);
+
+  // 當篩選條件、搜尋或貼文資料改變時，重設分頁載入筆數
+  useEffect(() => {
+    setVisiblePostsCount(15);
+  }, [posts, searchQuery, selectedGrade, selectedTeacher, selectedDate]);
+
+  // 分頁過濾後要渲染的貼文
+  const postsToRender = useMemo(() => {
+    return filteredPosts.slice(0, visiblePostsCount);
+  }, [filteredPosts, visiblePostsCount]);
 
   return (
     <div className="app-container">
@@ -426,10 +437,23 @@ export default function App() {
               <div className="spinner"></div>
               <span>正在從雲端 Drive 載入數據...</span>
             </div>
-          ) : filteredPosts.length > 0 ? (
-            filteredPosts.map(post => (
-              <PostCard key={post.post_id} post={post} />
-            ))
+          ) : postsToRender.length > 0 ? (
+            <>
+              {postsToRender.map(post => (
+                <PostCard key={post.post_id} post={post} />
+              ))}
+              {filteredPosts.length > visiblePostsCount && (
+                <div className="load-more-container" style={{ display: 'flex', justifyContent: 'center', padding: '16px 0 24px' }}>
+                  <button 
+                    className="filter-btn active" 
+                    style={{ width: 'auto', gap: '8px', padding: '8px 20px', fontSize: '0.82rem', fontWeight: '600', display: 'flex', alignItems: 'center' }}
+                    onClick={() => setVisiblePostsCount(prev => prev + 15)}
+                  >
+                    <span>顯示更多貼文 (還有 {filteredPosts.length - visiblePostsCount} 筆)</span>
+                  </button>
+                </div>
+              )}
+            </>
           ) : (
             // 找不到貼文時的狀態顯示
             <div className="empty-state">
