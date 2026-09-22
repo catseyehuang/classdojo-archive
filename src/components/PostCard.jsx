@@ -3,9 +3,10 @@ import { ExternalLink, Image, FileText, Video, Globe } from 'lucide-react';
 import { formatTaiwanDate, renderContentWithLinks } from '../utils';
 
 export default function PostCard({ post }) {
-  // 解析附件 JSON 字串
+  // 解析附件（相容 Supabase jsonb Array 或舊版 JSON 字串）
   const attachmentsList = useMemo(() => {
     if (!post.attachments) return [];
+    if (Array.isArray(post.attachments)) return post.attachments;
     try {
       const parsed = JSON.parse(post.attachments);
       return Array.isArray(parsed) ? parsed : [];

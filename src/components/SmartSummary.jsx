@@ -71,12 +71,12 @@ export default function SmartSummary({ filteredPosts, allPosts, apiKey }) {
     if (allPosts.length === 0) return { month: 9, baseDate: new Date() };
     const dateStr = allPosts[0].created_at_taiwan ? allPosts[0].created_at_taiwan.split('T')[0] : '';
     if (!dateStr) return { month: 9, baseDate: new Date() };
-    
+
     const parts = dateStr.split('-');
     const year = parseInt(parts[0], 10);
     const month = parseInt(parts[1], 10);
     const day = parseInt(parts[2], 10);
-    
+
     return {
       month: month,
       baseDate: new Date(year, month - 1, day)
@@ -87,18 +87,18 @@ export default function SmartSummary({ filteredPosts, allPosts, apiKey }) {
   const counts = useMemo(() => {
     if (allPosts.length === 0) return { week: 0, month: 0 };
     const { baseDate } = latestPostDateInfo;
-    
+
     let weekCount = 0;
     let monthCount = 0;
-    
+
     allPosts.forEach(post => {
       if (!post.created_at_taiwan) return;
-      const dateStr = post.created_at_taiwan.includes('T') 
-        ? post.created_at_taiwan.split('T')[0] 
+      const dateStr = post.created_at_taiwan.includes('T')
+        ? post.created_at_taiwan.split('T')[0]
         : post.created_at_taiwan.split(' ')[0];
       const parts = dateStr.split('-');
       const postDate = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
-      
+
       const diffTime = baseDate.getTime() - postDate.getTime();
       const diffDays = diffTime / (1000 * 60 * 60 * 24);
       if (diffDays >= 0) {
@@ -106,7 +106,7 @@ export default function SmartSummary({ filteredPosts, allPosts, apiKey }) {
         if (diffDays < 30) monthCount++;
       }
     });
-    
+
     return { week: weekCount, month: monthCount };
   }, [allPosts, latestPostDateInfo]);
 
@@ -116,18 +116,18 @@ export default function SmartSummary({ filteredPosts, allPosts, apiKey }) {
       return filteredPosts;
     }
     if (allPosts.length === 0) return [];
-    
+
     const { baseDate } = latestPostDateInfo;
     const daysLimit = aiRange === 'week' ? 7 : 30;
-    
+
     return allPosts.filter(post => {
       if (!post.created_at_taiwan) return false;
-      const dateStr = post.created_at_taiwan.includes('T') 
-        ? post.created_at_taiwan.split('T')[0] 
+      const dateStr = post.created_at_taiwan.includes('T')
+        ? post.created_at_taiwan.split('T')[0]
         : post.created_at_taiwan.split(' ')[0];
       const parts = dateStr.split('-');
       const postDate = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
-      
+
       const diffTime = baseDate.getTime() - postDate.getTime();
       const diffDays = diffTime / (1000 * 60 * 60 * 24);
       return diffDays >= 0 && diffDays < daysLimit;
@@ -143,7 +143,7 @@ export default function SmartSummary({ filteredPosts, allPosts, apiKey }) {
 
     setIsLoadingAI(true);
     setAiError('');
-    
+
     try {
       // 取得前 25 筆貼文內容，避免超出 context limit 且加快生成速度
       const postsText = postsForAI.slice(0, 25).map((post, idx) => {
@@ -392,7 +392,7 @@ ${contextText}
               postId: post.post_id
             });
           }
-        } 
+        }
         else if (hasNoticeKeyword && !hasTaskKeyword) {
           let cleanText = trimmed;
           if (cleanText.length > 90) {
@@ -445,7 +445,7 @@ ${contextText}
       // 學期期間：以最新貼文日期為基準，僅保留最後 7 天內（最後一週）的代辦事項
       const lastWeekTasks = rawTasks.filter(task => {
         if (!task.date) return false;
-        
+
         let taskDate;
         if (task.date.includes('-')) {
           const parts = task.date.split('-');
@@ -458,9 +458,9 @@ ${contextText}
           // 如果是其他文字 (如 "公告"、"星期五")，學期期間直接保留，不進行過濾
           return true;
         }
-        
+
         if (isNaN(taskDate.getTime())) return true; // 解析失敗則保留
-        
+
         const diffTime = baseDate.getTime() - taskDate.getTime();
         const diffDays = diffTime / (1000 * 60 * 60 * 24);
         // 保留 7 天內的任務
@@ -497,9 +497,9 @@ ${contextText}
           <BrainCircuit size={18} style={{ color: 'var(--primary)' }} />
           Gemini 智慧洞察
         </h3>
-        
+
         {summaryMode === 'ai' && (
-          <button 
+          <button
             onClick={() => setSummaryMode('local')}
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 8px', borderRadius: '4px', backgroundColor: '#f1f5f9' }}
             title="返回本地引擎"
@@ -552,7 +552,7 @@ ${contextText}
                 {summaryMode === 'ai' ? '● AI 總結模式' : '● 本地比對模式'}
               </span>
             </div>
-            
+
             <button
               onClick={handleGenerateAISummary}
               disabled={isLoadingAI}
@@ -594,16 +594,16 @@ ${contextText}
           <BrainCircuit size={15} style={{ color: 'var(--primary)' }} />
           詢問 AI 聯絡簿助理
         </h4>
-        
+
         {/* 對話歷史紀錄 - 視窗加高至 350px */}
-        <div 
-          className="chat-history" 
-          style={{ 
-            maxHeight: '350px', 
-            overflowY: 'auto', 
-            border: '1px solid #e2e8f0', 
-            borderRadius: '6px', 
-            padding: '8px', 
+        <div
+          className="chat-history"
+          style={{
+            maxHeight: '350px',
+            overflowY: 'auto',
+            border: '1px solid #e2e8f0',
+            borderRadius: '6px',
+            padding: '8px',
             backgroundColor: '#f8fafc',
             fontSize: '0.78rem',
             display: 'flex',
@@ -618,8 +618,8 @@ ${contextText}
             </div>
           ) : (
             chatHistory.map((msg, index) => (
-              <div 
-                key={index} 
+              <div
+                key={index}
                 style={{
                   alignSelf: msg.sender === 'user' ? 'flex-end' : 'flex-start',
                   backgroundColor: msg.sender === 'user' ? 'var(--primary-light)' : '#ffffff',
@@ -764,8 +764,8 @@ ${contextText}
             ) : (
               <div className="todo-list" style={{ maxHeight: '260px' }}>
                 {currentData.notices.map((notice, index) => (
-                  <div 
-                    key={index} 
+                  <div
+                    key={index}
                     className="todo-item"
                     style={{ cursor: 'default', borderLeft: '3.5px solid var(--accent)', padding: '8px 10px', background: '#f8fafc', marginBottom: '6px' }}
                   >
@@ -812,19 +812,19 @@ ${contextText}
                   <>
                     <div className="todo-subheading" style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', fontWeight: '600', margin: '8px 0 4px' }}>📝 待處理 ({pendingTasks.length})</div>
                     {pendingTasks.map((task, index) => (
-                      <div 
-                        key={`pending-${index}`} 
+                      <div
+                        key={`pending-${index}`}
                         className="todo-item"
                         style={{ padding: '8px 10px', display: 'flex', gap: '8px', alignItems: 'flex-start', cursor: 'pointer', marginBottom: '4px' }}
                         onClick={() => handleToggleTask(task.text)}
                       >
-                        <input 
-                          type="checkbox" 
+                        <input
+                          type="checkbox"
                           checked={false}
-                          onChange={() => {}}
+                          onChange={() => { }}
                           className="todo-checkbox"
                           style={{ marginTop: '2px' }}
-                          onClick={(e) => e.stopPropagation()} 
+                          onClick={(e) => e.stopPropagation()}
                         />
                         <div style={{ flexGrow: 1 }}>
                           <div className="todo-text" style={{ fontSize: '0.78rem', color: '#334155', lineHeight: '1.4' }}>{task.text}</div>
@@ -842,19 +842,19 @@ ${contextText}
                   <>
                     <div className="todo-subheading done" style={{ fontSize: '0.76rem', color: 'var(--text-muted)', fontWeight: '600', margin: '12px 0 4px' }}>✅ 已完成 ({doneTasks.length})</div>
                     {doneTasks.map((task, index) => (
-                      <div 
-                        key={`done-${index}`} 
+                      <div
+                        key={`done-${index}`}
                         className="todo-item completed"
                         style={{ padding: '8px 10px', display: 'flex', gap: '8px', alignItems: 'flex-start', cursor: 'pointer', marginBottom: '4px' }}
                         onClick={() => handleToggleTask(task.text)}
                       >
-                        <input 
-                          type="checkbox" 
+                        <input
+                          type="checkbox"
                           checked={true}
-                          onChange={() => {}}
+                          onChange={() => { }}
                           className="todo-checkbox"
                           style={{ marginTop: '2px' }}
-                          onClick={(e) => e.stopPropagation()} 
+                          onClick={(e) => e.stopPropagation()}
                         />
                         <div style={{ flexGrow: 1 }}>
                           <div className="todo-text" style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>{task.text}</div>
