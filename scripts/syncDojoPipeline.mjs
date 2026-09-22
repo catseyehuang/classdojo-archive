@@ -95,8 +95,11 @@ async function fetchMediaBuffer(url) {
 /**
  * 增量採集與同步主要流程
  */
-export async function runSyncPipeline(options = { maxPages: 5, forceMirrorAll: false }) {
-  console.log('🏁 啟動 ClassDojo 現代化雲端採集管線 (Phase 3.1)...');
+export async function runSyncPipeline(options = {}) {
+  const maxPages = options.maxPages || 100;
+  const untilDate = options.untilDate || process.env.UNTIL_DATE || '2026-06-30';
+  console.log(`🏁 啟動 ClassDojo 現代化雲端採集管線 (Phase 3.1)...`);
+  console.log(`🎯 目標抓取區間：從最新貼文一直回溯至 ${untilDate} (最多 ${maxPages} 頁)`);
 
   // 1. 檢驗 Session
   const isSessionValid = await verifySessionValid();
@@ -114,9 +117,10 @@ export async function runSyncPipeline(options = { maxPages: 5, forceMirrorAll: f
   let pageCount = 1;
   let totalNewPosts = 0;
   let totalUploadedMedia = 0;
+  let reachedUntilDate = false;
 
   try {
-    while (apiUrl && pageCount <= options.maxPages) {
+    while (apiUrl && pageCount <= maxPages && !reachedUntilDate) {
       console.log(`\n📄 正在抓取 ClassDojo 第 ${pageCount} 頁...`);
       const response = await apiRequest.get(apiUrl);
 
@@ -141,6 +145,13 @@ export async function runSyncPipeline(options = { maxPages: 5, forceMirrorAll: f
 
         const createdAt = item.time || item.createdAt;
         const taiwanTime = convertToTaiwanTime(createdAt);
+
+        // 若貼文時間已早於指定停止日期，標記結束
+        if (untilDate && taiwanTime && taiwanTime < untilDate) {
+          console.log(`  ⏹️ 貼文時間 (${taiwanTime}) 已早於指定截止日期 (${untilDate})，歷史已無縫銜接！`);
+          reachedUntilDate = true;
+          break;
+        }
         const grade = computeGradeSemester(taiwanTime);
         const author = item.headerText || item.senderName || item.header?.title || item.author || '未知老師';
         const className = item.headerSubtext || item.header?.subtitle || item.className || '';
@@ -239,6 +250,7 @@ export async function runSyncPipeline(options = { maxPages: 5, forceMirrorAll: f
 
 // 支援命令列直接執行: node scripts/syncDojoPipeline.mjs
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const maxPages = parseInt(process.env.MAX_PAGES || '3', 10);
-  runSyncPipeline({ maxPages });
+  const maxPages = parseInt(process.env.MAX_PAGES || '60', 10);
+  const untilDate = process.env.UNTIL_DATE || '2026-06-30';
+  runSyncPipeline({ maxPages, untilDate });
 }
