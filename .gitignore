@@ -31,3 +31,7 @@ public/dojo_data.json
 .env
 .env.local
 !.env.example
+
+# Playwright session credentials
+scripts/session/
+*.session.json
