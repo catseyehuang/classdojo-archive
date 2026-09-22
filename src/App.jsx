@@ -81,40 +81,49 @@ export default function App() {
   }, [fetchPostsFromSupabase]);
 
 
-  // 計算每個年級的原始總文章數
-  const gradeCounts = useMemo(() => {
-    const counts = {
-      'All': posts.length,
-      '114年下學期(二下)': 0,
-      '114年上學期(二上)': 0,
-      '113年下學期(一下)': 0,
-      '113年上學期(一上)': 0
-    };
+  // 計算每個年級的原始總文章數與動態年級清單
+  const { gradeCounts, availableGrades } = useMemo(() => {
+    const counts = { 'All': posts.length };
+    const gradesSet = new Set();
 
     posts.forEach(post => {
-      if (post.grade && post.grade in counts) {
-        counts[post.grade]++;
+      if (post.grade) {
+        counts[post.grade] = (counts[post.grade] || 0) + 1;
+        gradesSet.add(post.grade);
       }
     });
 
-    return counts;
+    const sortedGrades = Array.from(gradesSet).sort((a, b) => b.localeCompare(a));
+    return {
+      gradeCounts: counts,
+      availableGrades: [
+        { key: 'All', label: '所有年級' },
+        ...sortedGrades.map(g => ({ key: g, label: g }))
+      ]
+    };
   }, [posts]);
 
-  // 計算每個老師的原始文章數
-  const teacherCounts = useMemo(() => {
-    const counts = {
-      'All': posts.length,
-      'Teacher Adam': 0,
-      'Teacher Patty': 0
-    };
+  // 計算每個老師的原始文章數與動態教師清單
+  const { teacherCounts, availableTeachers } = useMemo(() => {
+    const counts = { 'All': posts.length };
+    const teacherMap = new Map();
 
     posts.forEach(post => {
-      if (post.author && post.author in counts) {
-        counts[post.author]++;
+      if (post.author) {
+        counts[post.author] = (counts[post.author] || 0) + 1;
+        teacherMap.set(post.author, counts[post.author]);
       }
     });
 
-    return counts;
+    const sortedTeachers = Array.from(teacherMap.keys()).sort((a, b) => (counts[b] || 0) - (counts[a] || 0));
+
+    return {
+      teacherCounts: counts,
+      availableTeachers: [
+        { key: 'All', label: '所有教師' },
+        ...sortedTeachers.map(t => ({ key: t, label: t }))
+      ]
+    };
   }, [posts]);
 
   // 多重過濾與全文檢索邏輯
@@ -323,11 +332,7 @@ export default function App() {
               發文教師篩選
             </h3>
             <div className="grade-filter-list">
-              {[
-                { key: 'All', label: '所有教師' },
-                { key: 'Teacher Adam', label: 'Tr. Adam' },
-                { key: 'Teacher Patty', label: 'Tr. Patty' }
-              ].map(tOpt => (
+              {availableTeachers.map(tOpt => (
                 <button
                   key={tOpt.key}
                   onClick={() => setSelectedTeacher(tOpt.key)}
@@ -352,13 +357,7 @@ export default function App() {
                 onChange={(e) => setSelectedGrade(e.target.value)}
                 className="grade-select"
               >
-                {[
-                  { key: 'All', label: '所有年級' },
-                  { key: '114年下學期(二下)', label: '114年下學期(二下)' },
-                  { key: '114年上學期(二上)', label: '114年上學期(二上)' },
-                  { key: '113年下學期(一下)', label: '113年下學期(一下)' },
-                  { key: '113年上學期(一上)', label: '113年上學期(一上)' }
-                ].map(gradeOpt => (
+                {availableGrades.map(gradeOpt => (
                   <option key={gradeOpt.key} value={gradeOpt.key}>
                     {gradeOpt.label} ({gradeCounts[gradeOpt.key] || 0})
                   </option>

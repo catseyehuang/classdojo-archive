@@ -20,6 +20,7 @@ export default function PostCard({ post }) {
   const getTeacherCardClass = (author) => {
     if (author === 'Teacher Adam') return 'teacher-adam';
     if (author === 'Teacher Patty') return 'teacher-patty';
+    if (author === 'Mr. Chen') return 'teacher-chen';
     return 'teacher-default';
   };
 
@@ -41,8 +42,16 @@ export default function PostCard({ post }) {
         border: '#10b981'
       };
     }
+    if (author === 'Mr. Chen') {
+      return {
+        initial: 'C',
+        bg: '#fef3c7',
+        color: '#92400e',
+        border: '#f59e0b'
+      };
+    }
     return {
-      initial: 'T',
+      initial: author ? author.replace(/^(Teacher|Mr\.|Ms\.|Mrs\.)\s*/i, '')[0] || 'T' : 'T',
       bg: '#f1f5f9',
       color: '#475569',
       border: '#94a3b8'

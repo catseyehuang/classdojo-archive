@@ -142,8 +142,8 @@ export async function runSyncPipeline(options = { maxPages: 5, forceMirrorAll: f
         const createdAt = item.time || item.createdAt;
         const taiwanTime = convertToTaiwanTime(createdAt);
         const grade = computeGradeSemester(taiwanTime);
-        const author = item.header?.title || item.author || '未知老師';
-        const className = item.header?.subtitle || item.className || '';
+        const author = item.headerText || item.senderName || item.header?.title || item.author || '未知老師';
+        const className = item.headerSubtext || item.header?.subtitle || item.className || '';
         const contentRaw = item.contents?.body || item.body || '';
 
         // 檢查 Supabase 是否已有此貼文
