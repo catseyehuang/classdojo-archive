@@ -1,4 +1,4 @@
-import { chromium } from 'playwright';
+import { chromium, request } from 'playwright';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -11,11 +11,29 @@ export const SESSION_DIR = path.resolve(__dirname, '../scripts/session');
 export const STORAGE_STATE_PATH = path.join(SESSION_DIR, 'storageState.json');
 
 /**
- * 確保 Session 目錄存在
+ * 確保 Session 目錄存在並嘗試從環境變數還原 Session
  */
-function ensureSessionDir() {
+export function ensureSessionDir() {
   if (!fs.existsSync(SESSION_DIR)) {
     fs.mkdirSync(SESSION_DIR, { recursive: true });
+  }
+
+  // 若環境變數包含 DOJO_STORAGE_STATE，自動寫入 storageState.json (供 CI/CD GitHub Actions 使用)
+  if (process.env.DOJO_STORAGE_STATE) {
+    try {
+      let content = process.env.DOJO_STORAGE_STATE.trim();
+      if (!content.startsWith('{')) {
+        try {
+          content = Buffer.from(content, 'base64').toString('utf-8');
+        } catch {
+          // not base64, keep raw string
+        }
+      }
+      fs.writeFileSync(STORAGE_STATE_PATH, content, 'utf-8');
+      console.log('🔑 已成功自環境變數 DOJO_STORAGE_STATE 還原 Session 憑證！');
+    } catch (err) {
+      console.warn('⚠️ 自環境變數還原 Session 失敗:', err.message);
+    }
   }
 }
 
@@ -24,24 +42,21 @@ function ensureSessionDir() {
  * @returns {Promise<boolean>}
  */
 export async function verifySessionValid() {
+  ensureSessionDir();
+
   if (!fs.existsSync(STORAGE_STATE_PATH)) {
     return false;
   }
 
-  let browser;
+  let requestContext;
   try {
-    browser = await chromium.launch({ headless: true });
-    const context = await browser.newContext({ storageState: STORAGE_STATE_PATH });
-    const page = await context.newPage();
-
-    // 發送輕量請求驗證 API
-    const response = await page.goto('https://home.classdojo.com/api/storyFeed?withStudentCommentsAndLikes=true&withSyntheticPosts=true', {
-      timeout: 15000,
-      waitUntil: 'commit'
+    requestContext = await request.newContext({ storageState: STORAGE_STATE_PATH });
+    const response = await requestContext.get('https://home.classdojo.com/api/storyFeed?withStudentCommentsAndLikes=true&withSyntheticPosts=true', {
+      timeout: 15000
     });
 
     const status = response.status();
-    await browser.close();
+    await requestContext.dispose();
 
     if (status === 200) {
       console.log('✅ 現有 ClassDojo Session 依然有效！');
@@ -51,7 +66,7 @@ export async function verifySessionValid() {
       return false;
     }
   } catch (err) {
-    if (browser) await browser.close();
+    if (requestContext) await requestContext.dispose().catch(() => {});
     console.log('⚠️ 驗證 Session 過程發生錯誤:', err.message);
     return false;
   }
