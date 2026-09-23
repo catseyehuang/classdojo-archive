@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Search, Inbox, Archive, Calendar as CalendarIcon, ClipboardList, Users, Database, Settings, X, Loader2, RefreshCw, BrainCircuit, ArrowLeft, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Search, Inbox, Archive, Calendar as CalendarIcon, ClipboardList, Users, Database, Settings, X, Loader2, RefreshCw, BrainCircuit, ArrowLeft, CheckCircle2, AlertCircle, LogOut, User as UserIcon } from 'lucide-react';
 import Calendar from './components/Calendar';
 import PostCard from './components/PostCard';
 import SmartSummary from './components/SmartSummary';
+import AuthGate from './components/AuthGate';
 import { supabase } from './supabaseClient';
 import './index.css';
 
@@ -13,6 +14,12 @@ export default function App() {
   const [selectedGrade, setSelectedGrade] = useState('All');
   const [selectedTeacher, setSelectedTeacher] = useState('All');
   const [selectedDate, setSelectedDate] = useState(null); // YYYY-MM-DD
+
+  // Auth & Whitelist states (POV-37)
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [isAuthorized, setIsAuthorized] = useState(false);
+  const [authError, setAuthError] = useState('');
 
   // Settings states (Gemini API Key 優先讀取環境變數 VITE_GEMINI_API_KEY，亦可於介面自訂並暫存 localStorage)
   const [geminiApiKey, setGeminiApiKey] = useState(() => localStorage.getItem('dojo_gemini_api_key') || import.meta.env.VITE_GEMINI_API_KEY || '');
@@ -75,10 +82,112 @@ export default function App() {
     }
   }, []);
 
-  // 初始載入
+  // 白名單校驗
+  const verifyUserWhitelist = useCallback(async (currentUser) => {
+    if (!currentUser || !currentUser.email) {
+      setIsAuthorized(false);
+      return false;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('authorized_users')
+        .select('email, name, role')
+        .eq('email', currentUser.email)
+        .maybeSingle();
+
+      if (error || !data) {
+        setIsAuthorized(false);
+        setAuthError(`帳號 ${currentUser.email} 尚未加入允許名單。`);
+        return false;
+      }
+
+      setIsAuthorized(true);
+      setAuthError('');
+      return true;
+    } catch (err) {
+      console.error('白名單驗證失敗:', err);
+      setIsAuthorized(false);
+      setAuthError('白名單驗證發生錯誤');
+      return false;
+    }
+  }, []);
+
+  // 登入與 Auth 狀態監聽
   useEffect(() => {
-    fetchPostsFromSupabase();
-  }, [fetchPostsFromSupabase]);
+    let mounted = true;
+
+    async function initAuth() {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const currentUser = session?.user ?? null;
+        if (mounted) {
+          setUser(currentUser);
+          if (currentUser) {
+            const ok = await verifyUserWhitelist(currentUser);
+            if (ok) {
+              fetchPostsFromSupabase();
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Auth 初始化失敗:', err);
+      } finally {
+        if (mounted) {
+          setAuthLoading(false);
+        }
+      }
+    }
+
+    initAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
+      if (currentUser) {
+        const ok = await verifyUserWhitelist(currentUser);
+        if (ok) {
+          fetchPostsFromSupabase();
+        }
+      } else {
+        setIsAuthorized(false);
+        setPosts([]);
+      }
+      setAuthLoading(false);
+    });
+
+    return () => {
+      mounted = false;
+      subscription?.unsubscribe();
+    };
+  }, [verifyUserWhitelist, fetchPostsFromSupabase]);
+
+  // Google 登入處理
+  const handleSignInWithGoogle = async () => {
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin + window.location.pathname
+        }
+      });
+      if (error) throw error;
+    } catch (err) {
+      alert('Google 登入失敗: ' + (err.message || err));
+    }
+  };
+
+  // 登出處理
+  const handleSignOut = async () => {
+    try {
+      await supabase.auth.signOut();
+      setUser(null);
+      setIsAuthorized(false);
+      setPosts([]);
+    } catch (err) {
+      console.error('登出失敗:', err);
+    }
+  };
 
 
   // 計算每個年級的原始總文章數與動態年級清單
@@ -174,6 +283,20 @@ export default function App() {
   const postsToRender = useMemo(() => {
     return filteredPosts;
   }, [filteredPosts]);
+
+  // 若未登入或不在白名單，渲染 AuthGate 守衛
+  if (authLoading || !user || !isAuthorized) {
+    return (
+      <AuthGate
+        authLoading={authLoading}
+        user={user}
+        isAuthorized={isAuthorized}
+        authError={authError}
+        onSignInWithGoogle={handleSignInWithGoogle}
+        onSignOut={handleSignOut}
+      />
+    );
+  }
 
   return (
     <div className="app-container">
@@ -275,6 +398,25 @@ export default function App() {
 
               <button className="settings-btn" onClick={() => setIsSettingsOpen(true)} title="開啟設定">
                 <Settings size={18} />
+              </button>
+
+              {/* 使用者 Google 資訊與登出按鈕 */}
+              <div className="user-profile-badge" title={`已登入: ${user.email}`}>
+                {user.user_metadata?.avatar_url ? (
+                  <img src={user.user_metadata.avatar_url} alt="Avatar" className="user-avatar-img" />
+                ) : (
+                  <div className="user-avatar-fallback"><UserIcon size={14} /></div>
+                )}
+                <span className="user-email-text">{user.user_metadata?.full_name || user.email}</span>
+              </div>
+
+              <button 
+                className="sign-out-nav-btn" 
+                onClick={handleSignOut} 
+                title="登出 Google 帳號"
+              >
+                <LogOut size={16} />
+                <span className="desktop-btn-text">登出</span>
               </button>
             </div>
           </>
