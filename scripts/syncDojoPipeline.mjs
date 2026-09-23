@@ -1,10 +1,9 @@
-import { chromium } from 'playwright';
+import { request } from 'playwright';
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 import path from 'path';
-import fs from 'fs';
 import { fileURLToPath } from 'url';
-import { uploadToR2, getR2Client } from './r2Client.mjs';
+import { uploadToR2 } from './r2Client.mjs';
 import { STORAGE_STATE_PATH, verifySessionValid, loginAndSaveSession } from './classDojoAuth.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -104,14 +103,16 @@ export async function runSyncPipeline(options = {}) {
   // 1. 檢驗 Session
   const isSessionValid = await verifySessionValid();
   if (!isSessionValid) {
+    if (process.env.CI) {
+      console.error('❌ 在 CI 環境中偵測到 Session 無效或未提供 DOJO_STORAGE_STATE！無法啟動互動式登入。請於 GitHub Secrets 更新 DOJO_STORAGE_STATE。');
+      process.exit(1);
+    }
     console.log('🔑 Session 不存在或已過期，啟動瀏覽器互動登入...');
     await loginAndSaveSession();
   }
 
-  // 2. 啟動 Playwright API 請求環境
-  const browser = await chromium.launch({ headless: true });
-  const context = await browser.newContext({ storageState: STORAGE_STATE_PATH });
-  const apiRequest = context.request;
+  // 2. 啟動 Playwright API 請求環境 (直接使用 APIRequestContext，無需啟動實體瀏覽器)
+  const apiRequest = await request.newContext({ storageState: STORAGE_STATE_PATH });
 
   let apiUrl = 'https://home.classdojo.com/api/storyFeed?withStudentCommentsAndLikes=true&withSyntheticPosts=true';
   let pageCount = 1;
@@ -244,13 +245,18 @@ export async function runSyncPipeline(options = {}) {
   } catch (err) {
     console.error('❌ 執行同步管線中斷:', err);
   } finally {
-    await browser.close();
+    if (apiRequest) {
+      await apiRequest.dispose().catch(() => {});
+    }
   }
 }
 
 // 支援命令列直接執行: node scripts/syncDojoPipeline.mjs
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const maxPages = parseInt(process.env.MAX_PAGES || '60', 10);
-  const untilDate = process.env.UNTIL_DATE || '2026-06-30';
+  const args = process.argv.slice(2);
+  const maxPagesArg = args.find(a => a.startsWith('--max-pages='));
+  const isDaily = args.includes('--daily');
+  const maxPages = isDaily ? 5 : (maxPagesArg ? parseInt(maxPagesArg.split('=')[1], 10) : parseInt(process.env.MAX_PAGES || '60', 10));
+  const untilDate = isDaily ? null : (process.env.UNTIL_DATE || '2026-06-30');
   runSyncPipeline({ maxPages, untilDate });
 }
