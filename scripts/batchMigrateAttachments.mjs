@@ -281,6 +281,14 @@ export async function runBatchMediaMigration(options = {}) {
             state.totalMigratedPosts++;
             state.totalMigratedMedia += postMediaUploaded;
             console.log(`    💾 已成功更新 Supabase 貼文附件 (${newAttachments.length} 個附件)`);
+
+            if (batchPostsCount % 100 === 0) {
+              console.log(`\n========================================================`);
+              console.log(`🎯 [里程碑] 本次執行已累計修補達 ${batchPostsCount} 筆貼文！`);
+              console.log(`🖼️ 本次已轉存 Cloudflare R2 媒體檔案共 ${batchMediaCount} 個`);
+              console.log(`📈 全專案累計修補貼文：${state.totalMigratedPosts} 筆 (媒體共 ${state.totalMigratedMedia} 個)`);
+              console.log(`========================================================\n`);
+            }
           }
         } else if (dryRun) {
           batchPostsCount++;
@@ -328,8 +336,9 @@ export async function runBatchMediaMigration(options = {}) {
 
 // 支援命令列直接執行
 const args = process.argv.slice(2);
+const isAll = args.includes('--all') || args.includes('-a');
 const batchArg = args.find(a => a.startsWith('--batch=') || a.startsWith('--target='));
-const targetPosts = batchArg ? parseInt(batchArg.split('=')[1], 10) : 100;
+const targetPosts = isAll ? Infinity : (batchArg ? parseInt(batchArg.split('=')[1], 10) : 100);
 const reset = args.includes('--reset');
 const dryRun = args.includes('--dry-run');
 

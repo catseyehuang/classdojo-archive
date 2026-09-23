@@ -11,7 +11,8 @@
     "predeploy": "npm run build",
     "postbuild": "rm -f dist/dojo_data.json",
     "deploy": "gh-pages -d dist",
-    "migrate:media": "node scripts/batchMigrateAttachments.mjs"
+    "migrate:media": "node scripts/batchMigrateAttachments.mjs",
+    "migrate:media:all": "node scripts/batchMigrateAttachments.mjs --all"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1137.0",
