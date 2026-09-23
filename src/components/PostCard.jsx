@@ -3,9 +3,10 @@ import { ExternalLink, Image, FileText, Video, Globe } from 'lucide-react';
 import { formatTaiwanDate, renderContentWithLinks } from '../utils';
 
 export default function PostCard({ post }) {
-  // 解析附件 JSON 字串
+  // 解析附件（相容 Supabase jsonb Array 或舊版 JSON 字串）
   const attachmentsList = useMemo(() => {
     if (!post.attachments) return [];
+    if (Array.isArray(post.attachments)) return post.attachments;
     try {
       const parsed = JSON.parse(post.attachments);
       return Array.isArray(parsed) ? parsed : [];
@@ -19,6 +20,7 @@ export default function PostCard({ post }) {
   const getTeacherCardClass = (author) => {
     if (author === 'Teacher Adam') return 'teacher-adam';
     if (author === 'Teacher Patty') return 'teacher-patty';
+    if (author === 'Mr. Chen') return 'teacher-chen';
     return 'teacher-default';
   };
 
@@ -40,8 +42,16 @@ export default function PostCard({ post }) {
         border: '#10b981'
       };
     }
+    if (author === 'Mr. Chen') {
+      return {
+        initial: 'C',
+        bg: '#fef3c7',
+        color: '#92400e',
+        border: '#f59e0b'
+      };
+    }
     return {
-      initial: 'T',
+      initial: author ? author.replace(/^(Teacher|Mr\.|Ms\.|Mrs\.)\s*/i, '')[0] || 'T' : 'T',
       bg: '#f1f5f9',
       color: '#475569',
       border: '#94a3b8'
@@ -113,6 +123,9 @@ export default function PostCard({ post }) {
               else displayName = `檔案-${idx + 1}`;
             }
 
+            // 判斷是否為 Cloudflare R2 永久可用網址
+            const isR2Url = att.url && (att.url.includes('.r2.dev') || att.url.includes('.r2.cloudflarestorage.com') || att.url.includes('jojociao.me'));
+
             if (isLink) {
               return (
                 <div 
@@ -126,11 +139,47 @@ export default function PostCard({ post }) {
               );
             }
 
+            // 若為 R2 永久網址，提供可點擊新分頁檢視 / 下載
+            if (isR2Url) {
+              return (
+                <a
+                  key={idx}
+                  href={att.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="tag-media-attachment-active"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '5px 12px',
+                    fontSize: '0.82rem',
+                    background: '#eff6ff',
+                    border: '1px solid #bfdbfe',
+                    borderRadius: '6px',
+                    color: '#1d4ed8',
+                    textDecoration: 'none',
+                    fontWeight: 500,
+                    transition: 'all 0.15s ease'
+                  }}
+                  title="點擊在新分頁開啟原始檔案 (Cloudflare R2)"
+                >
+                  {isPhoto && <Image size={14} style={{ color: '#2563eb' }} />}
+                  {isFile && <FileText size={14} style={{ color: '#2563eb' }} />}
+                  {isVideo && <Video size={14} style={{ color: '#2563eb' }} />}
+                  <span>{displayName} (R2)</span>
+                  <ExternalLink size={11} style={{ opacity: 0.7 }} />
+                </a>
+              );
+            }
+
+            // 歷史 AWS CloudFront 暫時性簽名過期附件：維持安全非點擊標籤
             return (
               <div 
                 key={idx} 
                 className="tag-media-attachment-disabled"
                 style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 10px', fontSize: '0.82rem', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '4px', color: '#64748b', cursor: 'default' }}
+                title="歷史過期附件 (非永久存檔)"
               >
                 {isPhoto && <Image size={13} style={{ color: '#0ea5e9' }} />}
                 {isFile && <FileText size={13} style={{ color: '#64748b' }} />}

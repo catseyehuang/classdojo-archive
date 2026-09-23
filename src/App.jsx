@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Inbox, Archive, Calendar as CalendarIcon, ClipboardList, Users, Cloud, Settings, X, Loader2, RefreshCw, BrainCircuit, ArrowLeft } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { Search, Inbox, Archive, Calendar as CalendarIcon, ClipboardList, Users, Database, Settings, X, Loader2, RefreshCw, BrainCircuit, ArrowLeft, CheckCircle2, AlertCircle } from 'lucide-react';
 import Calendar from './components/Calendar';
 import PostCard from './components/PostCard';
 import SmartSummary from './components/SmartSummary';
+import { supabase } from './supabaseClient';
 import './index.css';
 
 export default function App() {
@@ -13,145 +14,116 @@ export default function App() {
   const [selectedTeacher, setSelectedTeacher] = useState('All');
   const [selectedDate, setSelectedDate] = useState(null); // YYYY-MM-DD
 
-  // Google Drive & Settings states
-  const [driveApiKey, setDriveApiKey] = useState(() => localStorage.getItem('dojo_google_drive_api_key') || '');
-  const [geminiApiKey, setGeminiApiKey] = useState(() => localStorage.getItem('dojo_gemini_api_key') || '');
-  const [folderId, setFolderId] = useState(() => localStorage.getItem('dojo_folder_id') || '');
-  const [syncStatus, setSyncStatus] = useState('idle'); // 'idle' | 'loading' | 'success' | 'error'
+  // Settings states (Gemini API Key 優先讀取環境變數 VITE_GEMINI_API_KEY，亦可於介面自訂並暫存 localStorage)
+  const [geminiApiKey, setGeminiApiKey] = useState(() => localStorage.getItem('dojo_gemini_api_key') || import.meta.env.VITE_GEMINI_API_KEY || '');
+  const [syncStatus, setSyncStatus] = useState('loading'); // 'loading' | 'success' | 'error'
   const [syncError, setSyncError] = useState('');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [showSaveSuccess, setShowSaveSuccess] = useState(false);
   const [activeMobileTab, setActiveMobileTab] = useState('feed'); // 'filter' | 'feed' | 'summary'
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
-  const [visiblePostsCount, setVisiblePostsCount] = useState(15);
 
   const handleSaveSettings = () => {
-    localStorage.setItem('dojo_google_drive_api_key', driveApiKey);
     localStorage.setItem('dojo_gemini_api_key', geminiApiKey);
-    localStorage.setItem('dojo_folder_id', folderId);
     setShowSaveSuccess(true);
     setTimeout(() => setShowSaveSuccess(false), 2000);
   };
 
-  // 動態自本地/雲端同步的 json 檔案載入資料
-  useEffect(() => {
+  // 自 Supabase PostgreSQL 資料表 dojo_posts 分頁分批讀取全量貼文 (突破 PostgREST 1000 限制)
+  const fetchPostsFromSupabase = useCallback(async () => {
     setLoading(true);
-    fetch('./dojo_data.json')
-      .then(res => {
-        if (!res.ok) {
-          throw new Error('Network response was not ok');
-        }
-        return res.json();
-      })
-      .then(data => {
-        setPosts(data);
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error("Error loading dojo_data.json dynamically:", err);
-        setLoading(false);
-      });
-  }, []);
-
-  // 連結到 Google Drive 讀取 dojo_data.json
-  const handleConnectGDrive = async () => {
-    const finalApiKey = driveApiKey.trim();
-    if (!finalApiKey) {
-      alert('請先在設定中輸入 Google Drive API Key！');
-      setIsSettingsOpen(true);
-      return;
-    }
-
-    const finalFolderId = folderId.trim() || '1FdOzexsdBaIGcUXnKIoS0S-dyB_m-FMr';
     setSyncStatus('loading');
     setSyncError('');
-    setLoading(true);
 
     try {
-      // 步驟 1: 在指定資料夾中搜尋檔案並加上 Shared Drive 支援參數
-      const q = encodeURIComponent(`'${finalFolderId}' in parents and trashed = false`);
-      const searchUrl = `https://www.googleapis.com/drive/v3/files?q=${q}&key=${finalApiKey}&supportsAllDrives=true&includeItemsFromAllDrives=true`;
+      const allPosts = [];
+      const pageSize = 1000;
+      let from = 0;
+      let hasMore = true;
 
-      const searchRes = await fetch(searchUrl);
-      if (!searchRes.ok) {
-        const errorData = await searchRes.json().catch(() => ({}));
-        const msg = errorData.error?.message || '讀取資料夾失敗';
-        throw new Error(msg);
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('dojo_posts')
+          .select('*')
+          .order('created_at_taiwan', { ascending: false })
+          .range(from, from + pageSize - 1);
+
+        if (error) {
+          throw error;
+        }
+
+        if (Array.isArray(data) && data.length > 0) {
+          allPosts.push(...data);
+          if (data.length < pageSize) {
+            hasMore = false;
+          } else {
+            from += pageSize;
+          }
+        } else {
+          hasMore = false;
+        }
       }
 
-      const searchData = await searchRes.json();
-      if (!searchData.files || searchData.files.length === 0) {
-        throw new Error('在該雲端資料夾中找不到任何檔案，請確認資料夾權限已開放為「知道連結的任何人皆可檢視」');
-      }
-
-      // 在 JavaScript 中不分大小寫比對檔名，避免 query 語法限制
-      const matchedFile = searchData.files.find(f => f.name.trim().toLowerCase() === 'dojo_data.json');
-      if (!matchedFile) {
-        throw new Error('在資料夾中找不到名稱為 dojo_data.json 的檔案（請確認檔名大小寫與拼字是否完全一致）');
-      }
-
-      const fileId = matchedFile.id;
-
-      // 步驟 2: 藉由 fileId 下載檔案內容
-      const downloadUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&key=${finalApiKey}&supportsAllDrives=true`;
-      const downloadRes = await fetch(downloadUrl);
-      if (!downloadRes.ok) {
-        const errorData = await downloadRes.json().catch(() => ({}));
-        const msg = errorData.error?.message || '下載檔案失敗';
-        throw new Error(msg);
-      }
-
-      const data = await downloadRes.json();
-      if (Array.isArray(data)) {
-        setPosts(data);
-        setSyncStatus('success');
-      } else {
-        throw new Error('下載的 JSON 格式不符合預期的貼文陣列');
-      }
+      setPosts(allPosts);
+      setSyncStatus('success');
     } catch (err) {
-      console.error('Google Drive Sync Error:', err);
+      console.error('Supabase 載入錯誤:', err);
       setSyncStatus('error');
-      setSyncError(err.message || '連線發生錯誤');
-      alert(`連結 Google Drive 失敗: ${err.message || '未知錯誤'}`);
+      setSyncError(err.message || '無法連線至 Supabase 資料庫');
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  // 計算每個年級的原始總文章數
-  const gradeCounts = useMemo(() => {
-    const counts = {
-      'All': posts.length,
-      '114年下學期(二下)': 0,
-      '114年上學期(二上)': 0,
-      '113年下學期(一下)': 0,
-      '113年上學期(一上)': 0
-    };
+  // 初始載入
+  useEffect(() => {
+    fetchPostsFromSupabase();
+  }, [fetchPostsFromSupabase]);
+
+
+  // 計算每個年級的原始總文章數與動態年級清單
+  const { gradeCounts, availableGrades } = useMemo(() => {
+    const counts = { 'All': posts.length };
+    const gradesSet = new Set();
 
     posts.forEach(post => {
-      if (post.grade && post.grade in counts) {
-        counts[post.grade]++;
+      if (post.grade) {
+        counts[post.grade] = (counts[post.grade] || 0) + 1;
+        gradesSet.add(post.grade);
       }
     });
 
-    return counts;
+    const sortedGrades = Array.from(gradesSet).sort((a, b) => b.localeCompare(a));
+    return {
+      gradeCounts: counts,
+      availableGrades: [
+        { key: 'All', label: '所有年級' },
+        ...sortedGrades.map(g => ({ key: g, label: g }))
+      ]
+    };
   }, [posts]);
 
-  // 計算每個老師的原始文章數
-  const teacherCounts = useMemo(() => {
-    const counts = {
-      'All': posts.length,
-      'Teacher Adam': 0,
-      'Teacher Patty': 0
-    };
+  // 計算每個老師的原始文章數與動態教師清單
+  const { teacherCounts, availableTeachers } = useMemo(() => {
+    const counts = { 'All': posts.length };
+    const teacherMap = new Map();
 
     posts.forEach(post => {
-      if (post.author && post.author in counts) {
-        counts[post.author]++;
+      if (post.author) {
+        counts[post.author] = (counts[post.author] || 0) + 1;
+        teacherMap.set(post.author, counts[post.author]);
       }
     });
 
-    return counts;
+    const sortedTeachers = Array.from(teacherMap.keys()).sort((a, b) => (counts[b] || 0) - (counts[a] || 0));
+
+    return {
+      teacherCounts: counts,
+      availableTeachers: [
+        { key: 'All', label: '所有教師' },
+        ...sortedTeachers.map(t => ({ key: t, label: t }))
+      ]
+    };
   }, [posts]);
 
   // 多重過濾與全文檢索邏輯
@@ -198,15 +170,10 @@ export default function App() {
     return result;
   }, [posts, searchQuery, selectedGrade, selectedTeacher, selectedDate]);
 
-  // 當篩選條件、搜尋或貼文資料改變時，重設分頁載入筆數
-  useEffect(() => {
-    setVisiblePostsCount(15);
-  }, [posts, searchQuery, selectedGrade, selectedTeacher, selectedDate]);
-
-  // 分頁過濾後要渲染的貼文
+  // 一次性讀入全部內容
   const postsToRender = useMemo(() => {
-    return filteredPosts.slice(0, visiblePostsCount);
-  }, [filteredPosts, visiblePostsCount]);
+    return filteredPosts;
+  }, [filteredPosts]);
 
   return (
     <div className="app-container">
@@ -247,9 +214,9 @@ export default function App() {
                 <div className="header-subtitle-container" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <span className="header-subtitle">Jim 班級聯絡簿</span>
                   <span className="mobile-status-dot-wrapper">
-                    <span className={`sync-dot ${syncStatus === 'idle' ? 'local' : syncStatus}`} style={{ width: '6px', height: '6px', boxShadow: 'none' }}></span>
+                    <span className={`sync-dot ${syncStatus === 'success' ? 'success' : syncStatus === 'error' ? 'error' : 'loading'}`} style={{ width: '6px', height: '6px', boxShadow: 'none' }}></span>
                     <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                      {syncStatus === 'success' ? '雲端' : syncStatus === 'loading' ? '同步' : '本地'}
+                      {syncStatus === 'success' ? `${posts.length}筆` : syncStatus === 'loading' ? '載入' : '離線'}
                     </span>
                   </span>
                 </div>
@@ -278,12 +245,10 @@ export default function App() {
                 {syncStatus === 'loading' && <Loader2 className="sync-spinner" size={14} />}
                 {syncStatus === 'success' && <span className="sync-dot"></span>}
                 {syncStatus === 'error' && <span className="sync-dot error"></span>}
-                {syncStatus === 'idle' && <span className="sync-dot local"></span>}
                 <span className={`sync-status-text ${syncStatus}`}>
-                  {syncStatus === 'loading' && '同步中...'}
-                  {syncStatus === 'success' && '雲端同步中'}
-                  {syncStatus === 'error' && '同步失敗'}
-                  {syncStatus === 'idle' && '本地資料'}
+                  {syncStatus === 'loading' && 'Supabase 載入中...'}
+                  {syncStatus === 'success' && `Supabase 連線 (${posts.length} 筆)`}
+                  {syncStatus === 'error' && 'Supabase 連線失敗'}
                 </span>
               </div>
 
@@ -296,21 +261,17 @@ export default function App() {
                 <Search size={18} />
               </button>
 
-              {syncStatus === 'success' ? (
-                <button
-                  className="gdrive-refresh-btn"
-                  onClick={handleConnectGDrive}
-                  title="重新更新雲端資料"
-                  aria-label="重新更新雲端資料"
-                >
-                  <RefreshCw size={16} className={syncStatus === 'loading' ? "spinner-animate" : ""} style={{ animation: syncStatus === 'loading' ? 'spin 1s linear infinite' : 'none' }} />
-                </button>
-              ) : (
-                <button className="gdrive-btn" onClick={handleConnectGDrive} disabled={syncStatus === 'loading'}>
-                  <Cloud size={16} className="gdrive-icon" />
-                  <span className="desktop-btn-text">連結 Google Drive</span>
-                </button>
-              )}
+              <button
+                className="gdrive-refresh-btn"
+                onClick={fetchPostsFromSupabase}
+                title="重新整理 Supabase 資料"
+                aria-label="重新整理 Supabase 資料"
+                disabled={syncStatus === 'loading'}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+              >
+                <RefreshCw size={16} className={syncStatus === 'loading' ? "spinner-animate" : ""} style={{ animation: syncStatus === 'loading' ? 'spin 1s linear infinite' : 'none' }} />
+                <span className="desktop-btn-text" style={{ fontSize: '0.85rem' }}>重新整理</span>
+              </button>
 
               <button className="settings-btn" onClick={() => setIsSettingsOpen(true)} title="開啟設定">
                 <Settings size={18} />
@@ -371,11 +332,7 @@ export default function App() {
               發文教師篩選
             </h3>
             <div className="grade-filter-list">
-              {[
-                { key: 'All', label: '所有教師' },
-                { key: 'Teacher Adam', label: 'Tr. Adam' },
-                { key: 'Teacher Patty', label: 'Tr. Patty' }
-              ].map(tOpt => (
+              {availableTeachers.map(tOpt => (
                 <button
                   key={tOpt.key}
                   onClick={() => setSelectedTeacher(tOpt.key)}
@@ -400,13 +357,7 @@ export default function App() {
                 onChange={(e) => setSelectedGrade(e.target.value)}
                 className="grade-select"
               >
-                {[
-                  { key: 'All', label: '所有年級' },
-                  { key: '114年下學期(二下)', label: '114年下學期(二下)' },
-                  { key: '114年上學期(二上)', label: '114年上學期(二上)' },
-                  { key: '113年下學期(一下)', label: '113年下學期(一下)' },
-                  { key: '113年上學期(一上)', label: '113年上學期(一上)' }
-                ].map(gradeOpt => (
+                {availableGrades.map(gradeOpt => (
                   <option key={gradeOpt.key} value={gradeOpt.key}>
                     {gradeOpt.label} ({gradeCounts[gradeOpt.key] || 0})
                   </option>
@@ -418,9 +369,9 @@ export default function App() {
           {/* 雲端同步說明區塊 (貼底放置) */}
           <div className="sync-info-box">
             <div className="sync-info-title">
-              <span>ℹ️ 關於 Google Drive 同步：</span>
+              <span>⚡ 雲端資料庫狀態：</span>
             </div>
-            請在您的 Google 雲端硬碟根目錄設置名為 <code style={{ color: 'var(--accent)', fontWeight: '600' }}>dojo_data.json</code> 的檔案。本系統會自動連結進行全文分析。
+            已直連 Supabase PostgreSQL 資料庫，全量貼文即時檢索與 AI 智慧總結。
           </div>
         </section>
 
@@ -435,24 +386,13 @@ export default function App() {
           {loading ? (
             <div className="feed-loading-overlay">
               <div className="spinner"></div>
-              <span>正在從雲端 Drive 載入數據...</span>
+              <span>正在從 Supabase 雲端資料庫載入數據...</span>
             </div>
           ) : postsToRender.length > 0 ? (
             <>
               {postsToRender.map(post => (
                 <PostCard key={post.post_id} post={post} />
               ))}
-              {filteredPosts.length > visiblePostsCount && (
-                <div className="load-more-container" style={{ display: 'flex', justifyContent: 'center', padding: '16px 0 24px' }}>
-                  <button 
-                    className="filter-btn active" 
-                    style={{ width: 'auto', gap: '8px', padding: '8px 20px', fontSize: '0.82rem', fontWeight: '600', display: 'flex', alignItems: 'center' }}
-                    onClick={() => setVisiblePostsCount(prev => prev + 15)}
-                  >
-                    <span>顯示更多貼文 (還有 {filteredPosts.length - visiblePostsCount} 筆)</span>
-                  </button>
-                </div>
-              )}
             </>
           ) : (
             // 找不到貼文時的狀態顯示
@@ -504,19 +444,6 @@ export default function App() {
         </div>
         <div className="drawer-content">
           <div className="settings-field">
-            <label className="settings-label">Google Drive API Key</label>
-            <input
-              type="password"
-              className="settings-input"
-              value={driveApiKey}
-              onChange={(e) => setDriveApiKey(e.target.value)}
-              placeholder="請輸入 Google Drive API Key..."
-            />
-            <p className="settings-desc">
-              用於連線 Google Drive API 搜尋與下載 dojo_data.json。
-            </p>
-          </div>
-          <div className="settings-field">
             <label className="settings-label">Gemini API Key</label>
             <input
               type="password"
@@ -526,20 +453,19 @@ export default function App() {
               placeholder="請輸入 Gemini API Key..."
             />
             <p className="settings-desc">
-              用於右側智慧總結，透過 Gemini API 自動歸納功課與注意事項。
+              用於右側智慧總結與對話。已支援從 <code>.env</code> 的 <code>VITE_GEMINI_API_KEY</code> 自動讀取，亦可於此輸入儲存至瀏覽器。
             </p>
           </div>
+
           <div className="settings-field">
-            <label className="settings-label">Google Drive Folder ID</label>
-            <input
-              type="text"
-              className="settings-input"
-              value={folderId}
-              onChange={(e) => setFolderId(e.target.value)}
-              placeholder="請輸入雲端資料夾 ID"
-            />
-            <p className="settings-desc">
-              請輸入包含 dojo_data.json 的雲端資料夾 ID。
+            <label className="settings-label">Supabase 資料庫連線</label>
+            <div style={{ background: '#f8fafc', padding: '10px 12px', borderRadius: '8px', fontSize: '0.8rem', border: '1px solid #e2e8f0', color: '#475569' }}>
+              <div><strong>狀態：</strong> <span style={{ color: syncStatus === 'success' ? '#10b981' : syncStatus === 'loading' ? '#f59e0b' : '#ef4444' }}>{syncStatus === 'success' ? '連線正常' : syncStatus === 'loading' ? '連線中' : '連線失敗'}</span></div>
+              <div style={{ marginTop: '4px' }}><strong>資料表：</strong> <code>public.dojo_posts</code></div>
+              <div style={{ marginTop: '4px' }}><strong>已載入貼文：</strong> {posts.length} 筆</div>
+            </div>
+            <p className="settings-desc" style={{ marginTop: '6px' }}>
+              系統已全面改接 Supabase 雲端資料庫，原 Google Drive / GAS 相依已完全移除。
             </p>
           </div>
 

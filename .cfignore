@@ -1,0 +1,11 @@
+# Cloudflare Pages Build Ignore
+# Exclude backend pipelines, local crawler scripts, and sensitive configs from build uploads
+
+scripts/
+gas_script/
+archive/
+.env*
+!*.env.example
+*.md
+!README.md
+*dojo_data*.json

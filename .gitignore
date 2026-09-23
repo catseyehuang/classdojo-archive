@@ -24,5 +24,18 @@ dist-ssr
 *.sw?
 
 # Data files containing private records
-dojo_data.json
-public/dojo_data.json
+*dojo_data*.json
+src/dojo_data*.json
+public/dojo_data*.json
+
+# Legacy scripts
+gas_script/
+
+# Environment variables
+.env
+.env.local
+!.env.example
+
+# Playwright session credentials
+scripts/session/
+*.session.json
