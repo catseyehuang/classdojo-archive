@@ -1,8 +1,14 @@
-import React, { useMemo } from 'react';
-import { ExternalLink, Image, FileText, Video, Globe } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { ExternalLink, Image as ImageIcon, FileText, Video, Globe, ChevronDown, ChevronUp } from 'lucide-react';
 import { formatTaiwanDate, renderContentWithLinks } from '../utils';
+import { resolveTeacherTheme } from '../teacherProfiles';
 
-export default function PostCard({ post }) {
+export default function PostCard({ post, teacherProfiles, onOpenImageLightbox }) {
+  // 翻譯預設收合
+  const [isTranslationOpen, setIsTranslationOpen] = useState(false);
+  // 長文 clamp 展開/收合
+  const [isTextExpanded, setIsTextExpanded] = useState(false);
+
   // 解析附件（相容 Supabase jsonb Array 或舊版 JSON 字串）
   const attachmentsList = useMemo(() => {
     if (!post.attachments) return [];
@@ -16,180 +22,228 @@ export default function PostCard({ post }) {
     }
   }, [post.attachments]);
 
-  // 依據不同教師返回對應的 card class
-  const getTeacherCardClass = (author) => {
-    if (author === 'Teacher Adam') return 'teacher-adam';
-    if (author === 'Teacher Patty') return 'teacher-patty';
-    if (author === 'Mr. Chen') return 'teacher-chen';
-    return 'teacher-default';
-  };
+  // 教師個性化主題（規格書 7.4）
+  const teacherInfo = useMemo(() => {
+    return resolveTeacherTheme(post.author, teacherProfiles);
+  }, [post.author, teacherProfiles]);
 
-  // 獲取教師頭像的視覺配置
-  const getTeacherAvatarInfo = (author) => {
-    if (author === 'Teacher Adam') {
-      return {
-        initial: 'A',
-        bg: '#dbeafe',
-        color: '#1e40af',
-        border: '#3b82f6'
-      };
-    }
-    if (author === 'Teacher Patty') {
-      return {
-        initial: 'P',
-        bg: '#d1fae5',
-        color: '#065f46',
-        border: '#10b981'
-      };
-    }
-    if (author === 'Mr. Chen') {
-      return {
-        initial: 'C',
-        bg: '#fef3c7',
-        color: '#92400e',
-        border: '#f59e0b'
-      };
-    }
-    return {
-      initial: author ? author.replace(/^(Teacher|Mr\.|Ms\.|Mrs\.)\s*/i, '')[0] || 'T' : 'T',
-      bg: '#f1f5f9',
-      color: '#475569',
-      border: '#94a3b8'
-    };
-  };
-
-  const avatarInfo = useMemo(() => getTeacherAvatarInfo(post.author), [post.author]);
   const formattedDate = useMemo(() => formatTaiwanDate(post.created_at_taiwan), [post.created_at_taiwan]);
 
+  // 輔助函式：判斷附件是否為圖片
+  const checkIsImage = (att) => {
+    if (att.type === 'photo') return true;
+    if (att.filename && /\.(jpe?g|png|webp|gif|svg|bmp)$/i.test(att.filename)) return true;
+    if (att.url && /\.(jpe?g|png|webp|gif|svg|bmp)(\?|$)/i.test(att.url)) return true;
+    return false;
+  };
+
+  // 分離出圖片附件與非圖片附件
+  const { photoAttachments, nonPhotoAttachments } = useMemo(() => {
+    const photos = [];
+    const others = [];
+
+    attachmentsList.forEach((att, idx) => {
+      let displayName = att.filename && att.filename !== 'Unknown' ? att.filename : '';
+      if (!displayName) {
+        if (checkIsImage(att)) displayName = `照片-${idx + 1}`;
+        else if (att.type === 'video') displayName = `影片-${idx + 1}`;
+        else if (att.type === 'link') displayName = att.url || '外部連結';
+        else displayName = `檔案-${idx + 1}`;
+      }
+      const item = { ...att, filename: displayName, originalIndex: idx };
+      if (checkIsImage(att)) {
+        photos.push(item);
+      } else {
+        others.push(item);
+      }
+    });
+
+    return { photoAttachments: photos, nonPhotoAttachments: others };
+  }, [attachmentsList]);
+
+  // 判斷內文是否過長（簡易判斷超過 8 行或 300 字）
+  const content = post.content_raw ? post.content_raw.trim() : '';
+  const isLongText = useMemo(() => {
+    if (!content) return false;
+    const lines = content.split('\n').length;
+    return lines > 8 || content.length > 280;
+  }, [content]);
+
+  // 角色中文標籤（僅使用者有明確設定時顯示）
+  const roleLabel = useMemo(() => {
+    if (teacherInfo.role === 'local') return '中師';
+    if (teacherInfo.role === 'foreign') return '外師';
+    if (teacherInfo.role === 'other') return '專任';
+    return null;
+  }, [teacherInfo.role]);
+
+  // 圖片網格點擊
+  const handlePhotoClick = (index) => {
+    if (onOpenImageLightbox && photoAttachments.length > 0) {
+      onOpenImageLightbox(photoAttachments, index);
+    }
+  };
+
+  // 圖片網格最多顯示 5 張
+  const visiblePhotosCount = Math.min(photoAttachments.length, 5);
+  const extraPhotosCount = photoAttachments.length - 5;
+
+  const { solid, soft, ink } = teacherInfo.themeTokens;
+
   return (
-    <div className={`post-card ${getTeacherCardClass(post.author)}`} id={`post-${post.post_id}`}>
+    <article 
+      className="post-card" 
+      id={`post-${post.post_id}`}
+      data-teacher-theme={teacherInfo.theme}
+      style={{
+        '--t-solid': solid,
+        '--t-soft': soft,
+        '--t-ink': ink
+      }}
+    >
       {/* 標頭資訊 */}
       <div className="post-header">
         <div className="post-header-left">
-          {/* 教師頭像 */}
-          <div 
-            className="teacher-avatar" 
-            style={{ 
-              backgroundColor: avatarInfo.bg, 
-              color: avatarInfo.color, 
-              border: `1.5px solid ${avatarInfo.border}` 
-            }}
-          >
-            {avatarInfo.initial}
+          {/* A: 頭像（雙層環繞描邊 + 首字母） */}
+          <div className="teacher-avatar" aria-label={`教師頭像：${teacherInfo.displayName}`}>
+            {teacherInfo.initial}
           </div>
           <div className="post-meta">
-            <span className="post-author">{post.author || '未知老師'}</span>
-            <span className="post-date">{formattedDate}</span>
+            <div className="post-author-row">
+              <span className="post-author">{teacherInfo.displayName}</span>
+              {/* C: 角色標籤 */}
+              {roleLabel && (
+                <span className="teacher-role-badge">
+                  {roleLabel}
+                </span>
+              )}
+            </div>
+            <time className="post-date" dateTime={post.created_at_taiwan}>
+              {formattedDate}
+            </time>
           </div>
         </div>
-        {/* 班級標籤 (右上角，淺綠色) */}
+        {/* 班級標籤 */}
         {post.class_name && (
-          <span className="post-grade-badge" style={{ backgroundColor: '#ecfdf5', color: '#065f46', border: '1px solid #a7f3d0' }}>
+          <span className="post-grade-badge">
             {post.class_name}
           </span>
         )}
       </div>
 
-      {/* 貼文內文 */}
-      <div className="post-body">
-        {renderContentWithLinks(post.content_raw)}
-      </div>
-
-      {/* 翻譯內容 */}
-      {post.translation && post.translation.trim().length > 0 && (
-        <div className="post-translation">
-          <span className="translation-label">
-            <Globe size={12} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} />
-            翻譯 (譯文)：
-          </span>
-          {renderContentWithLinks(post.translation)}
+      {/* 貼文內文（若無文字則不渲染空白區） */}
+      {content.length > 0 && (
+        <div className="post-body-container">
+          <div className={`post-body ${!isTextExpanded && isLongText ? 'clamped' : ''}`}>
+            {renderContentWithLinks(content)}
+          </div>
+          {isLongText && (
+            <button
+              type="button"
+              className="text-expand-btn"
+              onClick={() => setIsTextExpanded(!isTextExpanded)}
+            >
+              <span>{isTextExpanded ? '收合全文 ▴' : '展開全文 ▾'}</span>
+            </button>
+          )}
         </div>
       )}
 
-      {/* 所有附件區塊 (照片、連結、檔案、影片皆在此處統一渲染為非點擊樣式) */}
-      {attachmentsList.length > 0 && (
-        <div className="post-attachments" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '12px' }}>
-          {attachmentsList.map((att, idx) => {
-            const isPhoto = att.type === 'photo';
-            const isLink = att.type === 'link';
-            const isFile = att.type === 'file';
-            const isVideo = att.type === 'video';
-
-            let displayName = att.filename && att.filename !== 'Unknown' ? att.filename : '';
-            if (!displayName) {
-              if (isPhoto) displayName = `照片-${idx + 1}`;
-              else if (isVideo) displayName = `影片-${idx + 1}`;
-              else if (isLink) displayName = att.url || '外部連結';
-              else displayName = `檔案-${idx + 1}`;
-            }
-
-            // 判斷是否為 Cloudflare R2 永久可用網址
-            const isR2Url = att.url && (att.url.includes('.r2.dev') || att.url.includes('.r2.cloudflarestorage.com') || att.url.includes('jojociao.me'));
-
-            if (isLink) {
-              return (
-                <div 
-                  key={idx} 
-                  className="btn-link-attachment-disabled"
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 12px', fontSize: '0.82rem', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '6px', color: '#64748b', cursor: 'default' }}
-                >
-                  <ExternalLink size={14} />
-                  <span>{displayName}</span>
-                </div>
-              );
-            }
-
-            // 若為 R2 永久網址，提供可點擊新分頁檢視 / 下載
-            if (isR2Url) {
-              return (
-                <a
-                  key={idx}
-                  href={att.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="tag-media-attachment-active"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '5px 12px',
-                    fontSize: '0.82rem',
-                    background: '#eff6ff',
-                    border: '1px solid #bfdbfe',
-                    borderRadius: '6px',
-                    color: '#1d4ed8',
-                    textDecoration: 'none',
-                    fontWeight: 500,
-                    transition: 'all 0.15s ease'
-                  }}
-                  title="點擊在新分頁開啟原始檔案 (Cloudflare R2)"
-                >
-                  {isPhoto && <Image size={14} style={{ color: '#2563eb' }} />}
-                  {isFile && <FileText size={14} style={{ color: '#2563eb' }} />}
-                  {isVideo && <Video size={14} style={{ color: '#2563eb' }} />}
-                  <span>{displayName} (R2)</span>
-                  <ExternalLink size={11} style={{ opacity: 0.7 }} />
-                </a>
-              );
-            }
-
-            // 歷史 AWS CloudFront 暫時性簽名過期附件：維持安全非點擊標籤
+      {/* 7.1.2 附件圖片直接預覽 (Facebook 風格網格，緊接在正文後、翻譯前) */}
+      {photoAttachments.length > 0 && (
+        <div 
+          className="media-grid" 
+          data-count={visiblePhotosCount}
+          role="group" 
+          aria-label={`附件圖片，共 ${photoAttachments.length} 張`}
+        >
+          {photoAttachments.slice(0, visiblePhotosCount).map((photo, idx) => {
+            const isLast = idx === 4 && extraPhotosCount > 0;
             return (
-              <div 
-                key={idx} 
-                className="tag-media-attachment-disabled"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 10px', fontSize: '0.82rem', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '4px', color: '#64748b', cursor: 'default' }}
-                title="歷史過期附件 (非永久存檔)"
+              <button
+                key={idx}
+                type="button"
+                className={`media-item ${isLast ? 'has-more' : ''}`}
+                data-more={isLast ? `+${extraPhotosCount + 1}` : undefined}
+                onClick={() => handlePhotoClick(idx)}
+                aria-label={`查看照片 ${idx + 1}`}
               >
-                {isPhoto && <Image size={13} style={{ color: '#0ea5e9' }} />}
-                {isFile && <FileText size={13} style={{ color: '#64748b' }} />}
-                {isVideo && <Video size={13} style={{ color: '#64748b' }} />}
-                <span>{displayName}</span>
-              </div>
+                <img
+                  src={photo.url}
+                  alt={photo.filename || `貼文圖片 ${idx + 1}`}
+                  loading="lazy"
+                  decoding="async"
+                  onLoad={(e) => e.currentTarget.classList.add('is-loaded')}
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                    e.currentTarget.parentElement.classList.add('img-error');
+                  }}
+                />
+              </button>
             );
           })}
         </div>
       )}
-    </div>
+
+      {/* 非圖片附件列表 */}
+      {nonPhotoAttachments.length > 0 && (
+        <div className="non-photo-attachments-list">
+          {nonPhotoAttachments.map((att, idx) => {
+            const isLink = att.type === 'link';
+            const isFile = att.type === 'file';
+            const isVideo = att.type === 'video';
+
+            return (
+              <a
+                key={idx}
+                href={att.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="non-photo-attachment-item"
+                title={`在新分頁開啟：${att.filename}`}
+              >
+                <div className="attachment-icon-wrap">
+                  {isVideo && <Video size={16} />}
+                  {isFile && <FileText size={16} />}
+                  {isLink && <ExternalLink size={16} />}
+                </div>
+                <span className="attachment-name">{att.filename}</span>
+                <span className="attachment-action-text">開啟 ↗</span>
+              </a>
+            );
+          })}
+        </div>
+      )}
+
+      {/* 7.1.3 英文翻譯內容（預設收合） */}
+      {post.translation && post.translation.trim().length > 0 && (
+        <div className="post-translation-container">
+          <button
+            type="button"
+            className={`translation-toggle-btn ${isTranslationOpen ? 'expanded' : ''}`}
+            onClick={() => setIsTranslationOpen(!isTranslationOpen)}
+            aria-expanded={isTranslationOpen}
+          >
+            <div className="translation-btn-left">
+              <Globe size={13} className="translation-icon" />
+              <span>{isTranslationOpen ? '收合英文翻譯 ▴' : '🌐 顯示英文翻譯 ▾'}</span>
+            </div>
+            {isTranslationOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          </button>
+
+          {isTranslationOpen && (
+            <div className="post-translation-box">
+              <div className="translation-header">
+                <Globe size={12} className="globe-icon" />
+                <span>翻譯（譯文）</span>
+              </div>
+              <div className="translation-body">
+                {renderContentWithLinks(post.translation)}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </article>
   );
 }

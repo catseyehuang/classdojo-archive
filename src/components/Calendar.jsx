@@ -1,23 +1,31 @@
 import React, { useState, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { resolveTeacherTheme } from '../teacherProfiles';
 
 const getDatePart = (dateStr) => {
   if (!dateStr) return '';
   return dateStr.includes('T') ? dateStr.split('T')[0] : dateStr.split(' ')[0];
 };
 
-export default function Calendar({ posts, selectedDate, onSelectDate }) {
-  // 找出貼文中所有包含貼文的台灣日期，格式為 YYYY-MM-DD
-  const postDates = useMemo(() => {
-    const dates = new Set();
+export default function Calendar({ posts, selectedDate, onSelectDate, teacherProfiles }) {
+  // 統計每日發文的所有教師主題色
+  const dateTeachersMap = useMemo(() => {
+    const map = new Map();
     posts.forEach(post => {
       if (post.created_at_taiwan) {
-        const datePart = getDatePart(post.created_at_taiwan); // 提取 "2026-06-26"
-        dates.add(datePart);
+        const datePart = getDatePart(post.created_at_taiwan);
+        if (!map.has(datePart)) {
+          map.set(datePart, new Map());
+        }
+        const teachersInDay = map.get(datePart);
+        if (post.author) {
+          const themeInfo = resolveTeacherTheme(post.author, teacherProfiles);
+          teachersInDay.set(post.author, themeInfo.themeTokens.solid);
+        }
       }
     });
-    return dates;
-  }, [posts]);
+    return map;
+  }, [posts, teacherProfiles]);
 
   // 以最新貼文的日期，或今日，做為日曆的初始月份
   const initialDate = useMemo(() => {
@@ -37,7 +45,7 @@ export default function Calendar({ posts, selectedDate, onSelectDate }) {
     '7月', '8月', '9月', '10月', '11月', '12月'
   ];
 
-  // 年份範圍（從資料中提取的年份，或預設 2023-2027）
+  // 年份範圍
   const years = useMemo(() => {
     const uniqueYears = new Set();
     posts.forEach(post => {
@@ -75,11 +83,8 @@ export default function Calendar({ posts, selectedDate, onSelectDate }) {
   // 生成日曆的日期格
   const calendarCells = useMemo(() => {
     const cells = [];
-    // 該月第一天是星期幾 (0-6)
     const firstDayIndex = new Date(currentYear, currentMonth, 1).getDay();
-    // 該月總天數
     const totalDays = new Date(currentYear, currentMonth + 1, 0).getDate();
-    // 前一個月的總天數（用於補齊前置空格）
     const prevMonthTotalDays = new Date(currentYear, currentMonth, 0).getDate();
 
     // 補足前一個月的尾端日期
@@ -133,34 +138,34 @@ export default function Calendar({ posts, selectedDate, onSelectDate }) {
     <div className="calendar-container">
       {/* 頂部導覽列 */}
       <div className="calendar-header-nav">
-        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+        <div className="calendar-select-group">
           <select 
             value={currentYear} 
             onChange={(e) => setCurrentYear(parseInt(e.target.value))}
             className="calendar-month-select"
-            style={{ padding: '2px 4px', border: '1px solid #e2e8f0', borderRadius: '4px', background: 'white' }}
+            aria-label="選擇年份"
           >
             {years.map(yr => (
-              <option key={yr} value={yr}>{yr}年</option>
+              <option key={yr} value={yr}>{yr} 年</option>
             ))}
           </select>
           <select 
             value={currentMonth} 
             onChange={(e) => setCurrentMonth(parseInt(e.target.value))}
             className="calendar-month-select"
-            style={{ padding: '2px 4px', border: '1px solid #e2e8f0', borderRadius: '4px', background: 'white' }}
+            aria-label="選擇月份"
           >
             {months.map((m, idx) => (
               <option key={idx} value={idx}>{m}</option>
             ))}
           </select>
         </div>
-        <div style={{ display: 'flex', gap: '4px' }}>
-          <button onClick={handlePrevMonth} className="calendar-nav-btn" aria-label="上一月">
-            <ChevronLeft size={16} />
+        <div className="calendar-nav-buttons">
+          <button onClick={handlePrevMonth} className="calendar-nav-btn" aria-label="上一月" title="上一月">
+            <ChevronLeft size={18} />
           </button>
-          <button onClick={handleNextMonth} className="calendar-nav-btn" aria-label="下一月">
-            <ChevronRight size={16} />
+          <button onClick={handleNextMonth} className="calendar-nav-btn" aria-label="下一月" title="下一月">
+            <ChevronRight size={18} />
           </button>
         </div>
       </div>
@@ -173,17 +178,37 @@ export default function Calendar({ posts, selectedDate, onSelectDate }) {
 
         {/* 日期格子 */}
         {calendarCells.map((cell, idx) => {
-          const hasPost = postDates.has(cell.dateStr);
+          const teachersMap = dateTeachersMap.get(cell.dateStr);
+          const hasPost = !!teachersMap && teachersMap.size > 0;
           const isSelected = selectedDate === cell.dateStr;
           const isToday = todayStr === cell.dateStr;
           
+          // 提取該日發文的教師色點（最多 3 點）
+          const colorDots = teachersMap ? Array.from(teachersMap.values()).slice(0, 3) : [];
+          const hasMoreDots = teachersMap && teachersMap.size > 3;
+
           return (
             <button
               key={idx}
+              type="button"
               onClick={() => onSelectDate(cell.dateStr)}
               className={`calendar-day ${!cell.isCurrentMonth ? 'other-month' : ''} ${hasPost ? 'has-post' : ''} ${isSelected ? 'selected' : ''} ${isToday ? 'today' : ''}`}
+              title={hasPost ? `${cell.dateStr} (有貼文)` : cell.dateStr}
             >
-              {cell.day}
+              <span className="calendar-day-number">{cell.day}</span>
+              {/* 教師色彩圓點 */}
+              {hasPost && !isSelected && (
+                <div className="calendar-dots-container">
+                  {colorDots.map((color, dotIdx) => (
+                    <span 
+                      key={dotIdx} 
+                      className="calendar-teacher-dot" 
+                      style={{ backgroundColor: color }}
+                    />
+                  ))}
+                  {hasMoreDots && <span className="calendar-more-dot">+</span>}
+                </div>
+              )}
             </button>
           );
         })}
@@ -192,7 +217,7 @@ export default function Calendar({ posts, selectedDate, onSelectDate }) {
       {/* 清除選擇按鈕 */}
       {selectedDate && (
         <button className="calendar-clear-btn" onClick={() => onSelectDate(null)}>
-          <X size={12} /> 清除日期篩選
+          <X size={12} /> 清除日期篩選 ({selectedDate})
         </button>
       )}
     </div>

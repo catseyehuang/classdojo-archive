@@ -44,6 +44,10 @@ export default function SmartSummary({ filteredPosts, allPosts, apiKey }) {
   const [showCopyTaskToast, setShowCopyTaskToast] = useState(false);
   const [copiedChatIndex, setCopiedChatIndex] = useState(null);
 
+  // 摺疊顯示全部狀態 (規格書 7.3)
+  const [showAllNotices, setShowAllNotices] = useState(false);
+  const [showAllTasks, setShowAllTasks] = useState(false);
+
   // 當勾選狀態改變時，寫入 localStorage
   useEffect(() => {
     localStorage.setItem('classdojo_completed_tasks', JSON.stringify(completedTasks));
@@ -540,182 +544,134 @@ ${contextText}
       </div>
 
       {/* AI 呼叫控制面板 */}
-      <div className="ai-control-panel" style={{ padding: '12px', borderRadius: '8px', background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)', border: '1px solid #d1fae5', marginBottom: '16px' }}>
+      <div className="ai-control-panel-v4">
         {apiKey ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.78rem', color: '#065f46', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <Sparkles size={14} style={{ color: '#10b981' }} />
-                已連結 Gemini 引擎
-              </span>
-              <span style={{ fontSize: '0.72rem', color: summaryMode === 'ai' ? '#047857' : '#9b9b9b' }}>
-                {summaryMode === 'ai' ? '● AI 總結模式' : '● 本地比對模式'}
-              </span>
+          <div className="ai-status-row">
+            <div className="ai-status-badge">
+              <span className="ai-status-dot"></span>
+              <span>已連結 Gemini 引擎</span>
             </div>
-
-            <button
-              onClick={handleGenerateAISummary}
-              disabled={isLoadingAI}
-              className="filter-btn active"
-              style={{
-                width: '100%',
-                justifyContent: 'center',
-                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                color: 'white',
-                border: 'none',
-                padding: '8px',
-                fontSize: '0.82rem',
-                fontWeight: '600',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                cursor: isLoadingAI ? 'not-allowed' : 'pointer',
-                borderRadius: '6px',
-                boxShadow: '0 2px 4px rgba(16, 185, 129, 0.15)'
-              }}
-            >
-              <RefreshCw size={14} className={isLoadingAI ? 'spinner-animate' : ''} style={{ animation: isLoadingAI ? 'spin 1s linear infinite' : 'none' }} />
-              {isLoadingAI ? 'Gemini 正在閱讀與分析中...' : `生成 Gemini AI (${aiRange === 'filtered' ? '當前' : aiRange === 'week' ? '本週' : '本月'})總結`}
-            </button>
+            <span className="ai-mode-text">
+              {summaryMode === 'ai' ? '● AI 總結模式' : '● 本地比對模式'}
+            </span>
           </div>
         ) : (
-          <div style={{ fontSize: '0.78rem', color: '#64748b', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <span style={{ fontWeight: '600', color: '#475569', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              ⚠️ 未啟用 AI 模式
-            </span>
-            請在右上角齒輪設定中輸入您的 Gemini API Key，即可啟用強大的 AI 智慧總結與分類功能。目前使用預設本地過濾。
+          <div className="ai-disabled-box">
+            <span className="ai-disabled-title">⚠️ 未啟用 AI 模式</span>
+            <p>請在右上角設定中輸入 Gemini API Key，即可啟用 AI 總結與問答。</p>
           </div>
+        )}
+
+        {apiKey && (
+          <button
+            type="button"
+            onClick={handleGenerateAISummary}
+            disabled={isLoadingAI}
+            className="generate-summary-gold-btn"
+          >
+            <RefreshCw size={15} className={isLoadingAI ? 'spinner-animate' : ''} />
+            <span>{isLoadingAI ? 'Gemini 正在閱讀與分析中...' : `生成 Gemini AI (${aiRange === 'filtered' ? '當前' : aiRange === 'week' ? '本週' : '本月'})總結`}</span>
+          </button>
         )}
       </div>
 
-      {/* 優化項目 B.3: 聯絡簿 AI 專屬助理 Q&A 對話區塊 (置頂至 AI 控制面板下方，並加高視窗) */}
-      <div className="sidebar-section" style={{ marginTop: '12px', borderBottom: '1px solid #f1f5f9', paddingBottom: '16px' }}>
-        <h4 className="panel-title" style={{ fontSize: '0.88rem', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-primary)' }}>
-          <BrainCircuit size={15} style={{ color: 'var(--primary)' }} />
+      {/* 詢問 AI 聯絡簿助理 Q&A 對話區塊 */}
+      <div className="summary-section-wrap">
+        <h4 className="section-serif-title">
+          <BrainCircuit size={17} className="gold-icon" />
           詢問 AI 聯絡簿助理
         </h4>
 
-        {/* 對話歷史紀錄 - 視窗加高至 350px */}
-        <div
-          className="chat-history"
-          style={{
-            maxHeight: '350px',
-            overflowY: 'auto',
-            border: '1px solid #e2e8f0',
-            borderRadius: '6px',
-            padding: '8px',
-            backgroundColor: '#f8fafc',
-            fontSize: '0.78rem',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '8px',
-            marginBottom: '8px'
-          }}
-        >
+        {/* 對話歷史紀錄 - 氣泡樣式 */}
+        <div className="chat-bubble-container">
           {chatHistory.length === 0 ? (
-            <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '16px 0', fontSize: '0.74rem' }}>
-              您可以問我：「這週有考試嗎？」或「英文老師派了什麼作業？」
+            <div className="chat-empty-state">
+              <p className="chat-script-greeting">Hello! 我是聯絡簿 AI 助理</p>
+              <p className="chat-empty-hint">您可以點選以下快捷問題，或直接在下方輸入：</p>
+              <div className="quick-prompt-chips">
+                {[
+                  '這週有考試嗎？',
+                  '英文老師派了什麼作業？',
+                  '明天需要帶什麼文具用品？'
+                ].map((prompt, qIdx) => (
+                  <button
+                    key={qIdx}
+                    type="button"
+                    className="quick-chip-btn"
+                    onClick={() => {
+                      setChatInput(prompt);
+                    }}
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </div>
             </div>
           ) : (
             chatHistory.map((msg, index) => (
               <div
                 key={index}
-                style={{
-                  alignSelf: msg.sender === 'user' ? 'flex-end' : 'flex-start',
-                  backgroundColor: msg.sender === 'user' ? 'var(--primary-light)' : '#ffffff',
-                  color: msg.sender === 'user' ? 'var(--primary)' : 'var(--text-primary)',
-                  padding: '8px 12px',
-                  borderRadius: '8px',
-                  maxWidth: '85%',
-                  boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-                  border: msg.sender === 'user' ? '1px solid var(--primary)' : '1px solid #e2e8f0',
-                  whiteSpace: 'pre-wrap',
-                  lineHeight: '1.4'
-                }}
+                className={`chat-bubble-row ${msg.sender === 'user' ? 'user-row' : 'ai-row'}`}
               >
-                <div style={{ fontWeight: '600', marginBottom: '4px', fontSize: '0.74rem', color: msg.sender === 'user' ? 'var(--primary)' : 'var(--accent)' }}>
-                  {msg.sender === 'user' ? '您：' : 'AI 助理：'}
-                </div>
-                <div style={{ fontSize: '0.78rem' }}>
-                  {renderMessageText(msg.text)}
-                </div>
-                {msg.sender === 'ai' && (
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '6px', borderTop: '1px dashed #e2e8f0', paddingTop: '4px' }}>
-                    <button
-                      onClick={() => handleCopyChatMessage(msg.text, index)}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        color: 'var(--primary)',
-                        padding: '2px',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '2px',
-                        fontSize: '0.68rem',
-                        fontWeight: '500'
-                      }}
-                      title="複製此回答"
-                    >
-                      <ClipboardList size={11} />
-                      <span>{copiedChatIndex === index ? '已複製！' : '複製回答'}</span>
-                    </button>
+                <div className={`chat-bubble ${msg.sender === 'user' ? 'user-bubble' : 'ai-bubble'}`}>
+                  <div className="chat-sender-label">
+                    {msg.sender === 'user' ? '您' : 'AI 助理'}
                   </div>
-                )}
+                  <div className="chat-text">
+                    {renderMessageText(msg.text)}
+                  </div>
+                  {msg.sender === 'ai' && (
+                    <div className="chat-copy-wrap">
+                      <button
+                        type="button"
+                        onClick={() => handleCopyChatMessage(msg.text, index)}
+                        className="copy-bubble-btn"
+                        title="複製此回答"
+                      >
+                        <ClipboardList size={11} />
+                        <span>{copiedChatIndex === index ? '已複製！' : '複製回答'}</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             ))
           )}
           {isChatLoading && (
-            <div style={{ alignSelf: 'flex-start', color: 'var(--text-muted)', padding: '4px', fontSize: '0.74rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <RefreshCw size={12} className="spinner-animate" style={{ animation: 'spin 1s linear infinite' }} />
-              AI 思考中...
+            <div className="chat-bubble-row ai-row">
+              <div className="chat-bubble ai-bubble loading-bubble">
+                <RefreshCw size={14} className="spinner-animate" />
+                <span>AI 助理正在檢索班級紀錄思考中...</span>
+              </div>
             </div>
           )}
           {chatError && (
-            <div style={{ alignSelf: 'center', color: '#ef4444', padding: '4px', fontSize: '0.74rem' }}>
+            <div className="chat-error-row">
               連線錯誤: {chatError}
             </div>
           )}
         </div>
 
         {/* 輸入與發送 */}
-        <form onSubmit={handleSendChatMessage} style={{ display: 'flex', gap: '6px' }}>
+        <form onSubmit={handleSendChatMessage} className="chat-input-form">
           <input
             type="text"
             value={chatInput}
             onChange={(e) => setChatInput(e.target.value)}
             placeholder="輸入您的問題..."
             disabled={isChatLoading || !apiKey}
-            style={{
-              flexGrow: 1,
-              padding: '6px 10px',
-              fontSize: '0.78rem',
-              border: '1px solid #cbd5e1',
-              borderRadius: '6px',
-              outline: 'none',
-              backgroundColor: apiKey ? 'white' : '#f1f5f9'
-            }}
+            className="chat-input-field"
           />
           <button
             type="submit"
             disabled={isChatLoading || !apiKey || !chatInput.trim()}
-            style={{
-              padding: '6px 12px',
-              fontSize: '0.78rem',
-              fontWeight: '600',
-              color: 'white',
-              backgroundColor: (isChatLoading || !apiKey || !chatInput.trim()) ? 'var(--text-muted)' : 'var(--primary)',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: (isChatLoading || !apiKey || !chatInput.trim()) ? 'not-allowed' : 'pointer',
-              transition: 'background-color 0.2s'
-            }}
+            className="chat-send-gold-btn"
           >
             發送
           </button>
         </form>
         {!apiKey && (
-          <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px', textAlign: 'center' }}>
+          <p className="chat-no-key-hint">
             請在右上角設定設定 Gemini API Key 才能與 AI 對話。
           </p>
         )}
@@ -723,148 +679,161 @@ ${contextText}
 
       {/* AI 載入中骨架屏 */}
       {isLoadingAI ? (
-        <div className="ai-skeleton-loader" style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '16px' }}>
-          <div className="skeleton-section" style={{ animation: 'pulse 1.5s infinite ease-in-out' }}>
-            <div style={{ height: '16px', background: '#e2e8f0', borderRadius: '4px', width: '50%', marginBottom: '8px' }}></div>
-            <div style={{ height: '35px', background: '#f1f5f9', borderRadius: '6px', width: '100%', marginBottom: '6px' }}></div>
-            <div style={{ height: '35px', background: '#f1f5f9', borderRadius: '6px', width: '100%' }}></div>
+        <div className="ai-skeleton-loader">
+          <div className="skeleton-section">
+            <div className="skeleton-bar-title"></div>
+            <div className="skeleton-bar-item"></div>
+            <div className="skeleton-bar-item"></div>
           </div>
-          <div className="skeleton-section" style={{ animation: 'pulse 1.5s infinite ease-in-out', animationDelay: '0.2s' }}>
-            <div style={{ height: '16px', background: '#e2e8f0', borderRadius: '4px', width: '40%', marginBottom: '8px' }}></div>
-            <div style={{ height: '35px', background: '#f1f5f9', borderRadius: '6px', width: '100%', marginBottom: '6px' }}></div>
-            <div style={{ height: '35px', background: '#f1f5f9', borderRadius: '6px', width: '100%' }}></div>
+          <div className="skeleton-section">
+            <div className="skeleton-bar-title"></div>
+            <div className="skeleton-bar-item"></div>
+            <div className="skeleton-bar-item"></div>
           </div>
         </div>
       ) : (
         <>
           {/* 注意事項區塊 */}
-          <div className="sidebar-section" style={{ marginTop: '16px' }}>
-            <h4 className="panel-title" style={{ fontSize: '0.88rem', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-primary)', justifyContent: 'space-between', width: '100%' }}>
+          <div className="summary-section-wrap" style={{ marginTop: '20px' }}>
+            <h4 className="section-serif-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <AlertCircle size={15} style={{ color: 'var(--accent)' }} />
+                <AlertCircle size={16} className="gold-icon" />
                 重要總結 / 注意事項 ({currentData.notices.length})
               </span>
               {currentData.notices.length > 0 && (
                 <button
+                  type="button"
                   onClick={handleCopyNotices}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)', padding: '2px', display: 'flex', alignItems: 'center' }}
+                  className="copy-text-btn"
                   title="複製注意事項"
                 >
-                  <span style={{ fontSize: '0.72rem', fontWeight: '500', marginRight: '3px' }}>
-                    {showCopyNoticeToast ? '已複製' : '複製'}
-                  </span>
+                  <span>{showCopyNoticeToast ? '已複製' : '複製'}</span>
                   <ClipboardList size={13} />
                 </button>
               )}
             </h4>
             {currentData.notices.length === 0 ? (
-              <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', textAlign: 'center', padding: '16px 0' }}>
-                目前無重要公告提醒
-              </div>
+              <div className="summary-empty-text">目前無重要公告提醒</div>
             ) : (
-              <div className="todo-list" style={{ maxHeight: '260px' }}>
-                {currentData.notices.map((notice, index) => (
-                  <div
-                    key={index}
-                    className="todo-item"
-                    style={{ cursor: 'default', borderLeft: '3.5px solid var(--accent)', padding: '8px 10px', background: '#f8fafc', marginBottom: '6px' }}
-                  >
-                    <div style={{ flexGrow: 1 }}>
-                      <div className="todo-text" style={{ fontWeight: '500', fontSize: '0.8rem', color: '#1e293b', lineHeight: '1.4' }}>{notice.text}</div>
-                      <div className="todo-meta">
-                        <span>📅 {notice.date}</span>
-                      </div>
+              <div className="notices-flat-list">
+                {(showAllNotices ? currentData.notices : currentData.notices.slice(0, 5)).map((notice, index) => (
+                  <div key={index} className="notice-card-item">
+                    <div className="notice-card-text">{notice.text}</div>
+                    <div className="notice-card-date">
+                      <span>📅 {notice.date}</span>
                     </div>
                   </div>
                 ))}
+                {currentData.notices.length > 5 && (
+                  <button
+                    type="button"
+                    className="show-more-toggle-btn"
+                    onClick={() => setShowAllNotices(!showAllNotices)}
+                  >
+                    {showAllNotices ? '收合部分注意事項 ▴' : `顯示全部注意事項 (${currentData.notices.length}) ▾`}
+                  </button>
+                )}
               </div>
             )}
           </div>
 
-          {/* 待辦事項區塊 */}
-          <div className="sidebar-section" style={{ marginTop: '16px' }}>
-            <h4 className="panel-title" style={{ fontSize: '0.88rem', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-primary)', justifyContent: 'space-between', width: '100%' }}>
+          {/* 聯絡簿待辦清單區塊 (依日期分組顯示) */}
+          <div className="summary-section-wrap" style={{ marginTop: '24px' }}>
+            <h4 className="section-serif-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <CheckSquare size={15} style={{ color: 'var(--primary)' }} />
+                <CheckSquare size={16} className="gold-icon" />
                 聯絡簿待辦清單 ({pendingTasks.length})
               </span>
               {pendingTasks.length > 0 && (
                 <button
+                  type="button"
                   onClick={handleCopyTasks}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)', padding: '2px', display: 'flex', alignItems: 'center' }}
+                  className="copy-text-btn"
                   title="複製待辦項目"
                 >
-                  <span style={{ fontSize: '0.72rem', fontWeight: '500', marginRight: '3px' }}>
-                    {showCopyTaskToast ? '已複製' : '複製'}
-                  </span>
+                  <span>{showCopyTaskToast ? '已複製' : '複製'}</span>
                   <ClipboardList size={13} />
                 </button>
               )}
             </h4>
+
             {pendingTasks.length === 0 && doneTasks.length === 0 ? (
-              <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', textAlign: 'center', padding: '16px 0' }}>
-                目前無待辦功課項目
-              </div>
+              <div className="summary-empty-text">目前無待辦功課項目</div>
             ) : (
-              <div className="todo-list">
-                {/* 待處理項目 */}
+              <div className="todos-flat-list">
+                {/* 待處理項目 (按日期群組展示) */}
                 {pendingTasks.length > 0 && (
                   <>
-                    <div className="todo-subheading" style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', fontWeight: '600', margin: '8px 0 4px' }}>📝 待處理 ({pendingTasks.length})</div>
-                    {pendingTasks.map((task, index) => (
-                      <div
-                        key={`pending-${index}`}
-                        className="todo-item"
-                        style={{ padding: '8px 10px', display: 'flex', gap: '8px', alignItems: 'flex-start', cursor: 'pointer', marginBottom: '4px' }}
-                        onClick={() => handleToggleTask(task.text)}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={false}
-                          onChange={() => { }}
-                          className="todo-checkbox"
-                          style={{ marginTop: '2px' }}
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                        <div style={{ flexGrow: 1 }}>
-                          <div className="todo-text" style={{ fontSize: '0.78rem', color: '#334155', lineHeight: '1.4' }}>{task.text}</div>
-                          <div className="todo-meta">
-                            <span>📅 {task.date}</span>
-                          </div>
+                    <div className="todo-group-header-label">
+                      <span>📝 待處理項目 ({pendingTasks.length})</span>
+                    </div>
+                    {/* 分組卡片 */}
+                    {Object.entries(
+                      (showAllTasks ? pendingTasks : pendingTasks.slice(0, 8)).reduce((acc, task) => {
+                        const d = task.date || '重要待辦';
+                        if (!acc[d]) acc[d] = [];
+                        acc[d].push(task);
+                        return acc;
+                      }, {})
+                    ).map(([dateGroup, tasksInDate], gIdx) => (
+                      <div key={gIdx} className="todo-date-group-card">
+                        <div className="todo-date-group-title">
+                          <span>📅 {dateGroup}</span>
+                          <span className="todo-date-count">{tasksInDate.length} 項</span>
+                        </div>
+                        <div className="todo-date-items">
+                          {tasksInDate.map((task, tIdx) => (
+                            <div
+                              key={tIdx}
+                              className="todo-single-row"
+                              onClick={() => handleToggleTask(task.text)}
+                            >
+                              <div className="custom-gold-checkbox" aria-hidden="true" />
+                              <div className="todo-row-content">
+                                <span className="todo-row-text">{task.text}</span>
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       </div>
                     ))}
+
+                    {pendingTasks.length > 8 && (
+                      <button
+                        type="button"
+                        className="show-more-toggle-btn"
+                        onClick={() => setShowAllTasks(!showAllTasks)}
+                      >
+                        {showAllTasks ? '收合部分待辦 ▴' : `顯示全部待辦清單 (${pendingTasks.length}) ▾`}
+                      </button>
+                    )}
                   </>
                 )}
 
                 {/* 已完成項目 */}
                 {doneTasks.length > 0 && (
-                  <>
-                    <div className="todo-subheading done" style={{ fontSize: '0.76rem', color: 'var(--text-muted)', fontWeight: '600', margin: '12px 0 4px' }}>✅ 已完成 ({doneTasks.length})</div>
-                    {doneTasks.map((task, index) => (
-                      <div
-                        key={`done-${index}`}
-                        className="todo-item completed"
-                        style={{ padding: '8px 10px', display: 'flex', gap: '8px', alignItems: 'flex-start', cursor: 'pointer', marginBottom: '4px' }}
-                        onClick={() => handleToggleTask(task.text)}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={true}
-                          onChange={() => { }}
-                          className="todo-checkbox"
-                          style={{ marginTop: '2px' }}
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                        <div style={{ flexGrow: 1 }}>
-                          <div className="todo-text" style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>{task.text}</div>
-                          <div className="todo-meta">
-                            <span>📅 {task.date}</span>
+                  <div style={{ marginTop: '16px' }}>
+                    <div className="todo-group-header-label done-label">
+                      <span>✅ 已完成項目 ({doneTasks.length})</span>
+                    </div>
+                    <div className="todo-date-group-card completed-group">
+                      <div className="todo-date-items">
+                        {doneTasks.map((task, dIdx) => (
+                          <div
+                            key={dIdx}
+                            className="todo-single-row completed"
+                            onClick={() => handleToggleTask(task.text)}
+                          >
+                            <div className="custom-gold-checkbox checked" aria-hidden="true" />
+                            <div className="todo-row-content">
+                              <span className="todo-row-text">{task.text}</span>
+                              <span className="todo-done-date">{task.date}</span>
+                            </div>
                           </div>
-                        </div>
+                        ))}
                       </div>
-                    ))}
-                  </>
+                    </div>
+                  </div>
                 )}
               </div>
             )}
