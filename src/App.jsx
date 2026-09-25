@@ -24,7 +24,7 @@ export default function App() {
   const [selectedDate, setSelectedDate] = useState(null); // YYYY-MM-DD
 
   // Settings states
-  const [geminiApiKey, setGeminiApiKey] = useState(() => localStorage.getItem('dojo_gemini_api_key') || import.meta.env.VITE_GEMINI_API_KEY || '');
+  const [geminiApiKey, setGeminiApiKey] = useState(() => localStorage.getItem('dojo_gemini_api_key') || '');
   const [syncStatus, setSyncStatus] = useState('loading'); // 'loading' | 'success' | 'error'
   const [syncError, setSyncError] = useState('');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
