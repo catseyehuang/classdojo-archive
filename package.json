@@ -8,7 +8,7 @@
     "build": "vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "predeploy": "npm run build",
+    "predeploy": "VITE_BASE_PATH=/classdojo-archive/ npm run build",
     "postbuild": "rm -f dist/dojo_data.json",
     "deploy": "gh-pages -d dist",
     "migrate:media": "node scripts/batchMigrateAttachments.mjs",
