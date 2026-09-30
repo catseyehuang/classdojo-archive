@@ -2,12 +2,17 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { 
   Search, Inbox, Archive, Calendar as CalendarIcon, Users, Settings, X, 
   Loader2, RefreshCw, BrainCircuit, ArrowLeft, Sparkles, Filter, ChevronDown, 
-  ChevronUp, Check, ArrowUp
+  ChevronUp, Check, ArrowUp, BookOpenCheck, Camera
 } from 'lucide-react';
 import Calendar from './components/Calendar';
 import PostCard from './components/PostCard';
 import SmartSummary from './components/SmartSummary';
 import ImageLightbox from './components/ImageLightbox';
+import ExamRadarBanner from './components/ExamRadarBanner';
+import DailyContactHub from './components/DailyContactHub';
+import SchoolCalendarStrip from './components/SchoolCalendarStrip';
+import calendarImg from './assets/115上_行事曆.png';
+import { DEFAULT_DEMO_HOMEWORK } from './utils/homeworkEngine';
 import { 
   getStoredTeacherProfiles, saveTeacherProfiles, PALETTE, TEACHER_THEMES, 
   normalizeName, resolveTeacherTheme 
@@ -154,41 +159,68 @@ export default function App() {
     });
   };
 
-  // 自 Supabase PostgreSQL 資料表 dojo_posts 分頁讀取
+  // 全域輕量中繼資料索引 (POV-43 架構防護：供 POV-46、年級與日曆使用)
+  const [metadataPosts, setMetadataPosts] = useState([]);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMorePosts, setHasMorePosts] = useState(true);
+
+  // 本週小考雷達狀態
+  const [exams, setExams] = useState(() => {
+    try {
+      const saved = localStorage.getItem('dojo_exam_radar_v5');
+      return saved ? JSON.parse(saved) : DEFAULT_DEMO_HOMEWORK.upcomingExams;
+    } catch (e) {
+      return DEFAULT_DEMO_HOMEWORK.upcomingExams;
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem('dojo_exam_radar_v5', JSON.stringify(exams));
+  }, [exams]);
+
+  // 自 Supabase 雙軌載入：全域中繼索引 + 最近 14 天完整貼文
   const fetchPostsFromSupabase = useCallback(async () => {
     setLoading(true);
     setSyncStatus('loading');
     setSyncError('');
 
     try {
-      const allPosts = [];
-      const pageSize = 1000;
-      let from = 0;
-      let hasMore = true;
+      // 軌道 A: 全域輕量中繼索引 (只抓 4 欄位，極速 30KB，用於 POV-46 教師統計與日曆打點)
+      const { data: metaData, error: metaError } = await supabase
+        .from('dojo_posts')
+        .select('post_id, created_at_taiwan, author, grade')
+        .order('created_at_taiwan', { ascending: false });
 
-      while (hasMore) {
-        const { data, error } = await supabase
+      if (metaError) throw metaError;
+      if (Array.isArray(metaData)) {
+        setMetadataPosts(metaData);
+      }
+
+      // 軌道 B: 首頁預設僅載入最近 14 天完整內容
+      const fourteenDaysAgo = new Date(Date.now() - 14 * 86400000).toISOString().split('T')[0];
+      let { data: recentPosts, error: recentError } = await supabase
+        .from('dojo_posts')
+        .select('*')
+        .gte('created_at_taiwan', `${fourteenDaysAgo} 00:00:00`)
+        .order('created_at_taiwan', { ascending: false });
+
+      if (recentError) throw recentError;
+
+      // 若最近 14 天貼文少於 15 篇，保底抓取最新 20 篇確保豐富性
+      if (!recentPosts || recentPosts.length < 15) {
+        const { data: fallbackPosts, error: fallbackError } = await supabase
           .from('dojo_posts')
           .select('*')
           .order('created_at_taiwan', { ascending: false })
-          .range(from, from + pageSize - 1);
-
-        if (error) throw error;
-
-        if (Array.isArray(data) && data.length > 0) {
-          allPosts.push(...data);
-          if (data.length < pageSize) {
-            hasMore = false;
-          } else {
-            from += pageSize;
-          }
-        } else {
-          hasMore = false;
+          .limit(20);
+        if (!fallbackError && Array.isArray(fallbackPosts)) {
+          recentPosts = fallbackPosts;
         }
       }
 
-      setPosts(allPosts);
+      setPosts(recentPosts || []);
       setSyncStatus('success');
+      setHasMorePosts((recentPosts || []).length < (metaData || []).length);
     } catch (err) {
       console.error('Supabase 載入錯誤:', err);
       setSyncStatus('error');
@@ -202,12 +234,88 @@ export default function App() {
     fetchPostsFromSupabase();
   }, [fetchPostsFromSupabase]);
 
-  // 動態年級清單
+  // 載入更早歷史貼文 (按需加載 30 篇)
+  const handleLoadMore = async () => {
+    if (isLoadingMore || !hasMorePosts || posts.length === 0) return;
+    setIsLoadingMore(true);
+
+    try {
+      const oldestLoadedDate = posts[posts.length - 1]?.created_at_taiwan;
+      if (!oldestLoadedDate) return;
+
+      const { data, error } = await supabase
+        .from('dojo_posts')
+        .select('*')
+        .lt('created_at_taiwan', oldestLoadedDate)
+        .order('created_at_taiwan', { ascending: false })
+        .limit(30);
+
+      if (error) throw error;
+
+      if (Array.isArray(data) && data.length > 0) {
+        setPosts(prev => {
+          const existingIds = new Set(prev.map(p => p.post_id));
+          const newPosts = data.filter(p => !existingIds.has(p.post_id));
+          const combined = [...prev, ...newPosts];
+          setHasMorePosts(combined.length < metadataPosts.length);
+          return combined;
+        });
+      } else {
+        setHasMorePosts(false);
+      }
+    } catch (err) {
+      console.error('載入更多貼文失敗:', err);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  };
+
+  // 選擇日曆日期時的按需抓取處理
+  const handleSelectCalendarDate = async (date) => {
+    setSelectedDate(date);
+    if (!date) {
+      handleTabChange('feed');
+      return;
+    }
+
+    const hasDateInPosts = posts.some(p => p.created_at_taiwan?.startsWith(date));
+    if (!hasDateInPosts) {
+      try {
+        setLoading(true);
+        const { data, error } = await supabase
+          .from('dojo_posts')
+          .select('*')
+          .gte('created_at_taiwan', `${date} 00:00:00`)
+          .lte('created_at_taiwan', `${date} 23:59:59`)
+          .order('created_at_taiwan', { ascending: false });
+
+        if (!error && Array.isArray(data) && data.length > 0) {
+          setPosts(prev => {
+            const existingIds = new Set(prev.map(p => p.post_id));
+            const newPosts = data.filter(p => !existingIds.has(p.post_id));
+            return [...newPosts, ...prev].sort((a, b) => 
+              (b.created_at_taiwan || '').localeCompare(a.created_at_taiwan || '')
+            );
+          });
+        }
+      } catch (err) {
+        console.error('按需抓取日曆日期貼文失敗:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    handleTabChange('feed');
+  };
+
+  // 全域統計資料來源 (優先使用輕量中繼索引，確保 POV-46 與篩選不受 14 天限制破壞)
+  const statsSource = metadataPosts.length > 0 ? metadataPosts : posts;
+
+  // 動態年級清單 (全歷史 2 年)
   const { gradeCounts, availableGrades } = useMemo(() => {
-    const counts = { 'All': posts.length };
+    const counts = { 'All': statsSource.length };
     const gradesSet = new Set();
 
-    posts.forEach(post => {
+    statsSource.forEach(post => {
       if (post.grade) {
         counts[post.grade] = (counts[post.grade] || 0) + 1;
         gradesSet.add(post.grade);
@@ -222,14 +330,14 @@ export default function App() {
         ...sortedGrades.map(g => ({ key: g, label: g }))
       ]
     };
-  }, [posts]);
+  }, [statsSource]);
 
-  // 動態教師清單
+  // 動態教師清單 (全歷史 2 年統計，POV-46 精準度 100%)
   const { teacherCounts, availableTeachers } = useMemo(() => {
-    const counts = { 'All': posts.length };
+    const counts = { 'All': statsSource.length };
     const teacherMap = new Map();
 
-    posts.forEach(post => {
+    statsSource.forEach(post => {
       if (post.author) {
         counts[post.author] = (counts[post.author] || 0) + 1;
         teacherMap.set(post.author, counts[post.author]);
@@ -245,7 +353,7 @@ export default function App() {
         ...sortedTeachers.map(t => ({ key: t, label: t }))
       ]
     };
-  }, [posts]);
+  }, [statsSource]);
 
   // 過濾貼文
   const filteredPosts = useMemo(() => {
@@ -303,14 +411,14 @@ export default function App() {
           {/* 左側：品牌 Logo 與站名 */}
           <div className="header-brand-group">
             <div className="brand-logo-badge" aria-hidden="true">
-              <span>CD</span>
+              <BookOpenCheck size={18} />
             </div>
             <div className="brand-title-group">
-              <h1 className="brand-title">ClassDojo Archive</h1>
+              <h1 className="brand-title-playwrite">ClassDojo Archive</h1>
               <div className="brand-sub-row">
                 <span className="brand-sub">Jim 班級聯絡簿</span>
                 <span className="post-count-capsule">
-                  <span className="count-number">{posts.length}</span> 篇
+                  <span className="count-number">{posts.length}</span> / {metadataPosts.length || posts.length} 篇
                 </span>
               </div>
             </div>
@@ -354,10 +462,10 @@ export default function App() {
       <aside className="desktop-sidebar-nav" aria-label="桌面側邊導覽">
         <div className="sidebar-brand-top">
           <div className="brand-logo-badge large">
-            <span>CD</span>
+            <BookOpenCheck size={22} />
           </div>
           <div className="brand-title-group">
-            <span className="brand-title">ClassDojo</span>
+            <span className="brand-title-playwrite">ClassDojo</span>
             <span className="brand-sub">歷史封存手帳</span>
           </div>
         </div>
@@ -428,11 +536,35 @@ export default function App() {
           {/* TAB 1: 貼文列表 (預設首頁) */}
           {activeTab === 'feed' && (
             <section className="feed-view-tab" aria-label="歷史貼文列表">
+
+              {/* 1. 本週小考雷達 (只有近期有考試時顯示，考後自動移除) */}
+              <ExamRadarBanner exams={exams} onUpdateExams={setExams} />
+
+              {/* 2. 【核心模組】今日智慧聯絡簿看板 (Daily Contact Hub) */}
+              <DailyContactHub
+                posts={posts}
+                apiKey={geminiApiKey}
+                onOpenLightbox={(photos, idx) => setLightboxData({ images: photos, index: idx })}
+                onExamsExtracted={(newExams) => {
+                  setExams(prev => {
+                    const existingScopes = new Set(prev.map(e => e.scope));
+                    const uniqueNew = newExams.filter(e => !existingScopes.has(e.scope));
+                    return [...uniqueNew, ...prev];
+                  });
+                }}
+              />
+
+              {/* 3. 三年級近期學校行事曆與大事件倒數 */}
+              <SchoolCalendarStrip
+                onOpenCalendarModal={() => setLightboxData({ images: [calendarImg], index: 0 })}
+              />
+
               {/* 篩選摘要列 (Sticky Filter Bar) */}
               <div className="filter-summary-bar">
                 <div className="filter-summary-left">
-                  <h2 className="feed-serif-heading">全部歷史紀錄</h2>
+                  <h2 className="feed-serif-heading">最近 14 天班級貼文</h2>
                   <span className="feed-total-pill">{filteredPosts.length} 篇</span>
+                  <span className="feed-badge">全庫共 {metadataPosts.length || posts.length} 篇</span>
                 </div>
 
                 {/* 已套用之篩選 Chip */}
@@ -481,16 +613,42 @@ export default function App() {
                   ))}
                 </div>
               ) : filteredPosts.length > 0 ? (
-                <div className="posts-stack">
-                  {filteredPosts.map(post => (
-                    <PostCard
-                      key={post.post_id}
-                      post={post}
-                      teacherProfiles={teacherProfiles}
-                      onOpenImageLightbox={(photos, idx) => setLightboxData({ images: photos, index: idx })}
-                    />
-                  ))}
-                </div>
+                <>
+                  <div className="posts-stack">
+                    {filteredPosts.map(post => (
+                      <PostCard
+                        key={post.post_id}
+                        post={post}
+                        teacherProfiles={teacherProfiles}
+                        onOpenImageLightbox={(photos, idx) => setLightboxData({ images: photos, index: idx })}
+                      />
+                    ))}
+                  </div>
+
+                  {/* 載入更早歷史貼文按鈕 */}
+                  {hasMorePosts && (
+                    <div className="load-more-wrapper">
+                      <button 
+                        type="button" 
+                        className="btn-load-more"
+                        onClick={handleLoadMore}
+                        disabled={isLoadingMore}
+                      >
+                        {isLoadingMore ? (
+                          <>
+                            <Loader2 size={16} className="spinner-animate" />
+                            <span>正在載入歷史貼文...</span>
+                          </>
+                        ) : (
+                          <>
+                            <span>載入更早歷史貼文 (按需加載)</span>
+                            <ArrowUp size={16} style={{ transform: 'rotate(180deg)' }} />
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
+                </>
               ) : (
                 /* 空狀態 */
                 <div className="empty-state-card">
@@ -528,14 +686,10 @@ export default function App() {
                   日曆時間檢視
                 </h3>
                 <Calendar
-                  posts={posts}
+                  posts={metadataPosts.length > 0 ? metadataPosts : posts}
                   selectedDate={selectedDate}
                   teacherProfiles={teacherProfiles}
-                  onSelectDate={(date) => {
-                    setSelectedDate(date);
-                    // 選擇日期後切換至貼文列表並滾動至頂部
-                    handleTabChange('feed');
-                  }}
+                  onSelectDate={handleSelectCalendarDate}
                 />
               </div>
 
@@ -820,11 +974,11 @@ export default function App() {
               <span className="settings-badge-sub">免改代碼即時生效</span>
             </label>
             <p className="settings-field-desc">
-              為中師、外師設定專屬角色與色票，換導師時直接在此調整即可。
+              為中師、外師設定專屬角色與色票，換導師時直接在此調整即可。（已自動隱藏歷史發文少於 10 篇之教師，維持預設雜湊色彩）
             </p>
 
             <div className="teachers-profile-manager-list">
-              {availableTeachers.filter(t => t.key !== 'All').map(tOpt => {
+              {availableTeachers.filter(t => t.key !== 'All' && (teacherCounts[t.key] || 0) >= 10).map(tOpt => {
                 const themeInfo = resolveTeacherTheme(tOpt.key, teacherProfiles);
                 const currentProfile = teacherProfiles[normalizeName(tOpt.key)] || {};
 
