@@ -35,7 +35,7 @@ export const TAIWAN_HOLIDAYS_115 = [
     lastSchoolDay: '2026-12-31'
   },
   {
-    name: '寒假與春節連假',
+    name: '2027寒假與春節連假',
     startDate: '2027-01-21',
     endDate: '2027-02-10',
     lastSchoolDay: '2027-01-20'

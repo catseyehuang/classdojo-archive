@@ -7,6 +7,7 @@ import {
   getActiveHomeworkDate, getSavedHomeworkState, saveHomeworkState, 
   DEFAULT_DEMO_HOMEWORK 
 } from '../utils/homeworkEngine';
+import todayContactBookImg from '../assets/today_contact_book.png';
 
 export default function DailyContactHub({ 
   posts = [], 
@@ -21,7 +22,11 @@ export default function DailyContactHub({
   const [isEditing, setIsEditing] = useState(false);
   const [isAnalyzingPhoto, setIsAnalyzingPhoto] = useState(false);
   const [analysisError, setAnalysisError] = useState('');
-  const [photoPreview, setPhotoPreview] = useState(homeworkData.photoUrl || '/thumbnail-contact.jpg');
+  const [photoPreview, setPhotoPreview] = useState(
+    (homeworkData.photoUrl && homeworkData.photoUrl !== '/thumbnail-contact.jpg')
+      ? homeworkData.photoUrl 
+      : todayContactBookImg
+  );
 
   const fileInputRef = useRef(null);
 
@@ -264,17 +269,27 @@ export default function DailyContactHub({
 
         {/* 來源動作與照片按鈕 */}
         <div className="hub-source-action">
-          {photoPreview && (
-            <button 
-              type="button" 
-              className="btn-view-photo"
-              onClick={() => onOpenLightbox && onOpenLightbox([photoPreview], 0)}
-              title="點擊查看聯絡簿原圖"
-            >
-              <img src={photoPreview} alt="聯絡簿照片" className="contact-thumb" />
-              <span>查看原圖</span>
-            </button>
-          )}
+          <button 
+            type="button" 
+            className="btn-view-photo"
+            onClick={() => {
+              const activePhoto = photoPreview || todayContactBookImg;
+              if (onOpenLightbox) {
+                onOpenLightbox([{ url: activePhoto, filename: '今日聯絡簿原圖.png' }], 0);
+              }
+            }}
+            title="點擊查看聯絡簿原圖"
+          >
+            <img 
+              src={photoPreview || todayContactBookImg} 
+              alt="聯絡簿照片" 
+              className="contact-thumb" 
+              onError={(e) => {
+                e.currentTarget.src = todayContactBookImg;
+              }}
+            />
+            <span>查看原圖</span>
+          </button>
 
           <button 
             type="button" 

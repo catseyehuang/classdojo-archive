@@ -9,7 +9,8 @@
   --font-serif: 'Noto Serif TC', Georgia, serif;
   --font-sans: 'Plus Jakarta Sans', 'Noto Sans TC', system-ui, -apple-system, sans-serif;
   --font-script: 'Caveat', cursive;
-  --font-handwriting: 'Playwrite AR', 'Caveat', cursive;
+  --font-brand: 'Fredoka', 'Outfit', var(--font-sans);
+  --font-handwriting: 'Fredoka', 'Outfit', var(--font-sans);
 
   /* Color Palette - Warm Gold & Cream (jojociao.me authentic tokens) */
   --bg-app: #FAF6F2;           /* 主底色：溫潤奶油白 */
@@ -195,12 +196,12 @@ body::before {
 }
 
 .brand-title {
-  font-family: var(--font-handwriting);
-  font-size: 1.15rem;
-  font-weight: 500;
-  color: var(--text-main);
-  letter-spacing: 0.01em;
-  line-height: 1.3;
+  font-family: var(--font-brand);
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #0F172A;
+  letter-spacing: -0.015em;
+  line-height: 1.2;
 }
 
 .brand-sub-row {
@@ -2455,79 +2456,82 @@ body::before {
    v5.1 New Layout & Components: DailyContactHub, ExamRadar, SchoolCalendar
    ========================================================================== */
 
-/* Brand title with Playwrite AR */
+/* Brand title with Fredoka & Outfit */
 .brand-title-playwrite {
-  font-family: var(--font-handwriting);
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: var(--text-main);
-  letter-spacing: 0.01em;
+  font-family: var(--font-brand);
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #0F172A;
+  letter-spacing: -0.015em;
   margin: 0;
   line-height: 1.2;
 }
 
-/* 1. Exam Radar Banner */
+/* 1. Exam Radar Banner - High Contrast, Clean & Punchy */
 .exam-radar-banner {
-  background: linear-gradient(135deg, #FFF9F0 0%, #FFF3E0 100%);
-  border: 1px solid #FFE0B2;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-left: 5px solid #EF4444;
   border-radius: var(--radius-lg);
-  padding: 14px 18px;
-  margin-bottom: 20px;
-  box-shadow: 0 3px 12px rgba(224, 122, 95, 0.08);
+  padding: 16px 20px;
+  margin-bottom: 22px;
+  box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05), 0 2px 6px -1px rgba(15, 23, 42, 0.03);
 }
 
 .radar-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 
 .radar-title-group {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .radar-pulse-dot {
-  width: 8px;
-  height: 8px;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
-  background: #E65100;
-  box-shadow: 0 0 0 0 rgba(230, 81, 0, 0.7);
+  background: #EF4444;
+  box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
   animation: radar-pulse 1.8s infinite;
 }
 
 @keyframes radar-pulse {
-  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(230, 81, 0, 0.7); }
-  70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(230, 81, 0, 0); }
-  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(230, 81, 0, 0); }
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+  70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
 }
 
 .radar-title {
-  font-size: 0.92rem;
-  font-weight: 700;
-  color: #BF360C;
+  font-size: 0.96rem;
+  font-weight: 750;
+  color: #0F172A;
+  letter-spacing: -0.01em;
 }
 
 .radar-count-tag {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: #E65100;
-  background: #FFE0B2;
-  padding: 2px 8px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #DC2626;
+  background: #FEF2F2;
+  border: 1px solid #FECACA;
+  padding: 2px 10px;
   border-radius: var(--radius-full);
 }
 
 .btn-add-exam-mini {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 10px;
+  gap: 5px;
+  padding: 5px 12px;
   border-radius: var(--radius-full);
-  border: 1px solid #FFE0B2;
-  background: #FFFFFF;
-  color: #E65100;
+  border: 1px solid #CBD5E1;
+  background: #F8FAFC;
+  color: #334155;
   font-size: 0.76rem;
   font-weight: 600;
   cursor: pointer;
@@ -2535,28 +2539,35 @@ body::before {
 }
 
 .btn-add-exam-mini:hover {
-  background: #FFE0B2;
+  background: #E2E8F0;
+  color: #0F172A;
+  border-color: #94A3B8;
 }
 
 .add-exam-inline-form {
   display: flex;
   gap: 8px;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
   flex-wrap: wrap;
+  padding: 12px;
+  background: #F8FAFC;
+  border-radius: var(--radius-md);
+  border: 1px solid #E2E8F0;
 }
 
 .input-inline {
-  padding: 6px 12px;
-  border: 1px solid var(--border-warm);
+  padding: 7px 12px;
+  border: 1px solid #CBD5E1;
   border-radius: var(--radius-sm);
   font-size: 0.82rem;
   background: #FFFFFF;
-  color: var(--text-main);
+  color: #0F172A;
   outline: none;
 }
 
 .input-inline:focus {
-  border-color: var(--gold-500);
+  border-color: #3B82F6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
 }
 
 .input-inline.full-w {
@@ -2565,14 +2576,19 @@ body::before {
 }
 
 .btn-confirm-add {
-  padding: 6px 14px;
-  background: var(--gold-600);
+  padding: 7px 16px;
+  background: #0F172A;
   color: #FFFFFF;
   border: none;
   border-radius: var(--radius-sm);
-  font-size: 0.8rem;
+  font-size: 0.82rem;
   font-weight: 600;
   cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.btn-confirm-add:hover {
+  background: #334155;
 }
 
 .exam-chips-grid {
@@ -2584,57 +2600,79 @@ body::before {
 .exam-chip {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  background: #FFFFFF;
-  border: 1px solid #FFCC80;
+  gap: 10px;
+  background: #F8FAFC;
+  border: 1.5px solid #CBD5E1;
   border-radius: var(--radius-md);
-  padding: 6px 12px;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  padding: 8px 14px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  transition: all 0.15s ease;
 }
 
 .exam-chip.urgent {
-  background: #FFF3E0;
-  border-color: #FF9800;
+  background: #FEF2F2;
+  border-color: #FCA5A5;
+  box-shadow: 0 2px 6px rgba(239, 68, 68, 0.08);
 }
 
 .exam-chip-content {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 
 .exam-date-badge {
   font-size: 0.72rem;
-  font-weight: 700;
-  background: #FFE0B2;
-  color: #BF360C;
-  padding: 2px 6px;
-  border-radius: 4px;
+  font-weight: 750;
+  background: #2563EB;
+  color: #FFFFFF;
+  padding: 3px 8px;
+  border-radius: 5px;
+  letter-spacing: 0.02em;
+  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.2);
+}
+
+.exam-chip.urgent .exam-date-badge {
+  background: #DC2626;
+  color: #FFFFFF;
+  box-shadow: 0 1px 2px rgba(220, 38, 38, 0.25);
 }
 
 .exam-subject {
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: var(--text-main);
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: #0F172A;
+}
+
+.exam-chip.urgent .exam-subject {
+  color: #991B1B;
 }
 
 .exam-scope {
-  font-size: 0.82rem;
-  color: var(--text-muted);
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.exam-chip.urgent .exam-scope {
+  color: #475569;
 }
 
 .btn-dismiss-exam {
   border: none;
   background: none;
-  font-size: 1.1rem;
-  color: var(--text-faint);
+  font-size: 1.2rem;
+  color: #94A3B8;
   cursor: pointer;
   line-height: 1;
-  padding: 0 2px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: all 0.12s ease;
 }
 
 .btn-dismiss-exam:hover {
-  color: #D32F2F;
+  background: #E2E8F0;
+  color: #DC2626;
 }
 
 /* 2. Daily Contact Hub Card */

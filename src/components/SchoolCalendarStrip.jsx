@@ -20,10 +20,11 @@ export default function SchoolCalendarStrip({ onOpenCalendarModal }) {
     return { label: `倒數 ${diffDays} 天`, status: 'future' };
   };
 
-  // 取得未來或今日的重要事件（前 10 個）
+  // 取得未來或今日的重要事件（排除國定連假與補假，專注於學校活動、評量與考查）
   const upcomingEvents = events
     .filter(e => {
-      // 包含今天或未來的事件
+      // 連假不用放進去
+      if (e.type === 'holiday') return false;
       return e.date >= todayStr || getDaysLeft(e.date).status !== 'past';
     })
     .slice(0, 8);

@@ -556,7 +556,10 @@ export default function App() {
 
               {/* 3. 三年級近期學校行事曆與大事件倒數 */}
               <SchoolCalendarStrip
-                onOpenCalendarModal={() => setLightboxData({ images: [calendarImg], index: 0 })}
+                onOpenCalendarModal={() => setLightboxData({ 
+                  images: [{ url: calendarImg, filename: '115學年度上學期三年級學校行事曆.png' }], 
+                  index: 0 
+                })}
               />
 
               {/* 篩選摘要列 (Sticky Filter Bar) */}

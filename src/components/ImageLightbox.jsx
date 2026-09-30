@@ -6,8 +6,9 @@ export default function ImageLightbox({ images = [], initialIndex = 0, onClose }
   const touchStartX = useRef(null);
 
   const total = images.length;
-  const currentImage = images[currentIndex] || {};
-  const imageUrl = currentImage.url || '';
+  const rawImage = images[currentIndex];
+  const currentImage = typeof rawImage === 'string' ? { url: rawImage } : (rawImage || {});
+  const imageUrl = currentImage.url || (typeof rawImage === 'string' ? rawImage : '');
   const imageName = currentImage.filename && currentImage.filename !== 'Unknown' 
     ? currentImage.filename 
     : `照片附件 ${currentIndex + 1}`;
