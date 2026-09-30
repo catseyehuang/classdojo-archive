@@ -167,7 +167,7 @@ export default function App() {
   // 本週小考雷達狀態
   const [exams, setExams] = useState(() => {
     try {
-      const saved = localStorage.getItem('dojo_exam_radar_v5');
+      const saved = localStorage.getItem('dojo_exam_radar_v5_2');
       return saved ? JSON.parse(saved) : DEFAULT_DEMO_HOMEWORK.upcomingExams;
     } catch (e) {
       return DEFAULT_DEMO_HOMEWORK.upcomingExams;
@@ -175,7 +175,7 @@ export default function App() {
   });
 
   useEffect(() => {
-    localStorage.setItem('dojo_exam_radar_v5', JSON.stringify(exams));
+    localStorage.setItem('dojo_exam_radar_v5_2', JSON.stringify(exams));
   }, [exams]);
 
   // 自 Supabase 雙軌載入：全域中繼索引 + 最近 14 天完整貼文
