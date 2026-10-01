@@ -2,10 +2,11 @@ name: ClassDojo Daily Sync
 
 on:
   schedule:
-    # 台灣時間 (Asia/Taipei, UTC+8) 週一至週五 17:00 ~ 21:00 每整點執行一次 => UTC 09:00 ~ 13:00
-    - cron: '0 9-13 * * 1-5'
-    # 台灣時間 (Asia/Taipei, UTC+8) 週六與週日 每日 19:30 => UTC 11:30
-    - cron: '30 11 * * 0,6'
+    # 台灣時間 (Asia/Taipei, UTC+8) 週一至週五 17:05, 18:05, 19:05, 20:05, 21:05 執行一次
+    # （避開 GitHub Actions 整點 :00 全球尖峰排隊與丟失） => UTC 09:05, 10:05, 11:05, 12:05, 13:05
+    - cron: '5 9,10,11,12,13 * * 1-5'
+    # 台灣時間 (Asia/Taipei, UTC+8) 週六與週日 每日 19:35 => UTC 11:35
+    - cron: '35 11 * * 0,6'
   workflow_dispatch: # 支援在 GitHub Actions 頁面手動一鍵觸發執行
 
 jobs:
