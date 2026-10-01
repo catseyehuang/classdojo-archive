@@ -35,6 +35,24 @@ export default function DailyContactHub({
     saveHomeworkState(homeworkData);
   }, [homeworkData]);
 
+  // 自動偵測最新貼文中的聯絡簿作業附圖
+  useEffect(() => {
+    if (!posts || posts.length === 0) return;
+    const homeworkPost = posts.find(p => {
+      const text = (p.content_raw || p.body || '').toLowerCase();
+      const hasKeywords = text.includes('作業') || text.includes('聯絡簿') || text.includes('附圖');
+      const hasPhoto = p.attachments && p.attachments.some(a => a.type === 'photo' || a.url?.match(/\.(jpg|jpeg|png|webp)/i));
+      return hasKeywords && hasPhoto;
+    });
+
+    if (homeworkPost && homeworkPost.attachments?.length > 0) {
+      const photo = homeworkPost.attachments.find(a => a.type === 'photo' || a.url?.match(/\.(jpg|jpeg|png|webp)/i));
+      if (photo && photo.url && (!homeworkData.photoUrl || homeworkData.photoUrl === '')) {
+        setPhotoPreview(photo.url);
+      }
+    }
+  }, [posts, homeworkData.photoUrl]);
+
   // 切換單一作業打勾狀態
   const handleToggleTask = (column, taskId) => {
     setHomeworkData(prev => {

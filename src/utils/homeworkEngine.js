@@ -135,39 +135,39 @@ export function getActiveHomeworkDate(today = new Date()) {
  * 預設基準範例聯絡簿資料（若尚無當日貼文或辨識，以此為優質展示）
  */
 export const DEFAULT_DEMO_HOMEWORK = {
-  date: '2026-09-30',
-  dateTaiwanStr: '115 年 9 月 30 日 (星期三)',
+  date: '2026-10-01',
+  dateTaiwanStr: '115 年 10 月 1 日 (星期四)',
   photoUrl: '',
   chineseTasks: [
-    { id: 'c-1', text: '1. 甲本 p21~23', completed: false, isExam: false },
-    { id: 'c-2', text: '2. 數習 p36~37', completed: false, isExam: false },
-    { id: 'c-3', text: '3. 社卷 (100) 分訂簽', completed: false, isExam: false },
-    { id: 'c-4', text: '4. 明考國卷 L4', completed: false, isExam: true },
-    { id: 'c-5', text: '5. 明考社課 p24~25 標題默寫', completed: false, isExam: true }
+    { id: 'c-1', text: '1. 國作 p24~26', completed: false, isExam: false },
+    { id: 'c-2', text: '2. 數練 p38', completed: false, isExam: false },
+    { id: 'c-3', text: '3. 訂簽數L3卷，回鄉偶書', completed: false, isExam: false },
+    { id: 'c-4', text: '4. 國習 p56，社修 p29 前', completed: false, isExam: false },
+    { id: 'c-5', text: '5. 訂簽國L4卷', completed: false, isExam: false }
   ],
   englishTasks: [
-    { id: 'e-1', text: '1. Correct, published, sign S2 Writing', completed: false, isExam: false },
-    { id: 'e-2', text: '2. Correct, review, sign PW', completed: false, isExam: false },
-    { id: 'e-3', text: '3. Correct, review, sign GB p10', completed: false, isExam: false },
-    { id: 'e-4', text: '4. Review S3 story', completed: false, isExam: false }
+    { id: 'e-1', text: '1. Write + sign p62-70', completed: false, isExam: false },
+    { id: 'e-2', text: '2. I did the reading test today', completed: false, isExam: false },
+    { id: 'e-3', text: '3. Review U4S3', completed: false, isExam: false },
+    { id: 'e-4', text: '4. Rewrite: Thank You letter', completed: false, isExam: false }
   ],
   notices: [
-    { id: 'n-1', text: '✍️ 社卷 (100) 分訂簽', type: 'sign' },
-    { id: 'n-2', text: '✍️ 英文 S2 Writing 訂簽', type: 'sign' },
-    { id: 'n-3', text: '✍️ 英文 PW 訂簽', type: 'sign' },
-    { id: 'n-4', text: '✍️ 英文 GB p10 訂簽', type: 'sign' }
+    { id: 'n-1', text: '✍️ 訂簽數 L3 卷', type: 'sign' },
+    { id: 'n-2', text: '✍️ 訂簽國 L4 卷', type: 'sign' },
+    { id: 'n-3', text: '✍️ 英文 Write + sign p62-70 訂簽', type: 'sign' },
+    { id: 'n-4', text: '📢 加強九九(十十)乘法表背誦', type: 'bring' }
   ],
   upcomingExams: [
-    { id: 'ex-1', subject: '國語', scope: '明考國卷 L4', date: '2026-10-01', urgent: true },
-    { id: 'ex-2', subject: '社會', scope: '明考社課 p24~25 標題默寫', date: '2026-10-01', urgent: true }
+    { id: 'ex-1', subject: '國語', scope: '國卷 L4 (順延至明日測驗)', date: '2026-10-02', urgent: true },
+    { id: 'ex-2', subject: '數學', scope: '數卷 L3 (依原定時間測驗)', date: '2026-10-02', urgent: true }
   ]
 };
 
 /**
  * 本地 Storage Key 定義
  */
-const STORAGE_KEY_HOMEWORK_STATE = 'dojo_homework_state_v5_2';
-const STORAGE_KEY_EXAM_RADAR = 'dojo_exam_radar_v5_2';
+const STORAGE_KEY_HOMEWORK_STATE = 'dojo_homework_state_v5_3';
+const STORAGE_KEY_EXAM_RADAR = 'dojo_exam_radar_v5_3';
 
 /**
  * 載入並整合自動全打勾規則之聯絡簿狀態
